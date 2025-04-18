@@ -7,6 +7,12 @@ export interface Location {
   image?: string; // URL изображения места проведения
 }
 
+export enum Status {
+  COMINGUP = 'Предстоит',
+  UNDERWAY = 'Идёт',
+  HELD = 'Прошло',
+}
+
 export interface Event {
   id: string;
   title: string;
@@ -14,8 +20,8 @@ export interface Event {
   date: string;
   duration: string;
   organizer: string;
-  format: 'online' | 'offline';
+  status: Status;
   location: Location;
   tags: Tag[];
-  image?: string; // URL изображения мероприятия
+  image?: string; // URL изображения лицевой стороны
 } 

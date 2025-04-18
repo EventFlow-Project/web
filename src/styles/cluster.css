@@ -1,0 +1,21 @@
+.marker-cluster-custom {
+  background-clip: padding-box;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+  text-align: center;
+  font-size: 14px;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.5);
+}
+
+.marker-cluster-custom div {
+  width: 30px;
+  height: 30px;
+  border-radius: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+} 

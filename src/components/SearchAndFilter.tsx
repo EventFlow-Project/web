@@ -99,11 +99,12 @@ const SearchAndFilter: React.FC<SearchAndFilterProps> = (props) => {
     tags: Tag[],
     dateRangeValue: string
   ) => {
+    // Всегда начинаем с оригинального массива событий
     let filtered = [...events];
 
     // Поиск по названию и организаторам
     if (search) {
-      const searchLower = search.toLowerCase();
+      const searchLower = search.toLowerCase().trim();
       filtered = filtered.filter(
         event =>
           event.title.toLowerCase().includes(searchLower) ||
@@ -136,7 +137,12 @@ const SearchAndFilter: React.FC<SearchAndFilterProps> = (props) => {
       });
     }
 
-    onFilterChange(filtered);
+    // Убедимся, что у нас нет дубликатов перед отправкой
+    const uniqueFiltered = filtered.filter((event, index, self) =>
+      index === self.findIndex((e) => e.id === event.id)
+    );
+
+    onFilterChange(uniqueFiltered);
   };
 
   const getSelectedDefaultTags = (): DefaultTag[] => {
@@ -160,7 +166,7 @@ const SearchAndFilter: React.FC<SearchAndFilterProps> = (props) => {
       <Box sx={{ display: 'flex', gap: 1, width: '100%' }}>
         <TextField
           fullWidth
-          placeholder="Поиск по названию и организаторам"
+          placeholder="Поиск"
           value={searchTerm}
           onChange={handleSearchChange}
           variant="outlined"

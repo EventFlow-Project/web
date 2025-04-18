@@ -4,7 +4,9 @@ export enum DefaultTag {
   MEETUP = 'Митап',
   HACKATHON = 'Хакатон',
   EXHIBITION = 'Выставка',
-  FESTIVAL = 'Фестиваль'
+  FESTIVAL = 'Фестиваль',
+  ONLINE = 'Онлайн',
+  OFFLINE = 'Оффлайн',
 }
 
 export const defaultTagColors: Record<DefaultTag, string> = {
@@ -13,8 +15,11 @@ export const defaultTagColors: Record<DefaultTag, string> = {
   [DefaultTag.MEETUP]: '#3357FF',
   [DefaultTag.HACKATHON]: '#F033FF',
   [DefaultTag.EXHIBITION]: '#FF33F0',
-  [DefaultTag.FESTIVAL]: '#33FFF0'
+  [DefaultTag.FESTIVAL]: '#33FFF0',
+  [DefaultTag.ONLINE]: '#A4DF45',
+  [DefaultTag.OFFLINE]: '#4133FF',
 };
+
 
 export const DEFAULT_CUSTOM_TAG_COLOR = '#808080';
 

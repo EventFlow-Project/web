@@ -88,7 +88,7 @@ const Header: React.FC = () => {
           </Button>
           <Button 
             component={Link} 
-            to="/events" 
+            to="/" 
             onClick={handleEventsClick}
             sx={{ color: 'black', textTransform: 'none' }}
           >
@@ -115,7 +115,7 @@ const Header: React.FC = () => {
         <Box sx={{ display: 'flex', gap: 2 }}>
           <Button 
             component={Link} 
-            to="/profile" 
+            to="/profile/organizer" 
             sx={{ color: 'black', textTransform: 'none' }}
           >
             Профиль
