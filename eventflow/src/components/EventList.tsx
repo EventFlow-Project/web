@@ -51,7 +51,6 @@ const EventCard: React.FC<{ event: Event }> = ({ event }) => {
   const [lastClickTime, setLastClickTime] = useState(0);
   const [backImage, setBackImage] = useState<HTMLImageElement | null>(null);
 
-  // Предзагрузка изображения для задней стороны
   useEffect(() => {
     const img = new Image();
     img.src = event.location.image || 'https://via.placeholder.com/300x400';
@@ -243,7 +242,11 @@ const EventCard: React.FC<{ event: Event }> = ({ event }) => {
                 </Box>
               )}
             </Box>
-            <CardContent>
+            <CardContent sx={{ 
+              display: 'flex', 
+              flexDirection: 'column',
+              height: '100%'
+            }}>
               <Box sx={{ mb: 2 }}>
                 {event.tags.map((tag, index) => {
                   const color = getTagColor(tag);
@@ -253,12 +256,13 @@ const EventCard: React.FC<{ event: Event }> = ({ event }) => {
                       label={getTagLabel(tag)}
                       size="small"
                       variant="outlined"
-                      sx={{ 
+                      sx={{
                         mr: 0.5, 
-                        mb: 0.5,
+                        mb: 0.2,
                         border: 'none',
                         color: color,
-                        fontSize: '17px', 
+                        fontSize: '16px',
+                        fontWeight: 500,
                       }}
                     />
                   );
@@ -270,19 +274,75 @@ const EventCard: React.FC<{ event: Event }> = ({ event }) => {
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                 {event.description}
               </Typography>
-              <Box sx={{ mt: 'auto' }}>
-                <Typography variant="body2">
-                  <strong>Организатор:</strong> {event.organizer}
-                </Typography>
-                <Typography variant="body2">
-                  <strong>Место:</strong> {event.location.address}
-                </Typography>
-                <Typography variant="body2">
-                  <strong>Дата:</strong> {event.date}
-                </Typography>
-                <Typography variant="body2">
-                  <strong>Продолжительность:</strong> {event.duration}
-                </Typography>
+              
+              <Box sx={{ 
+                marginTop: 'auto',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 1,
+                position: 'relative',
+                bottom: 0,
+                width: '100%'
+              }}>
+                {/* Длительность и организатор */}
+                <Box sx={{ 
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  color: 'text.secondary',
+                  fontSize: '13px'
+                }}>
+                  <Typography 
+                    variant="body2" 
+                    sx={{ 
+                      color: 'inherit',
+                      fontSize: 'inherit'
+                    }}
+                  >
+                    {event.duration}
+                  </Typography>
+                  <Typography 
+                    variant="body2" 
+                    sx={{ 
+                      color: 'inherit',
+                      fontSize: 'inherit',
+                      fontStyle: 'italic'
+                    }}
+                  >
+                    {event.organizer}
+                  </Typography>
+                </Box>
+
+                {/* Адрес и дата */}
+                <Box sx={{ 
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  color: 'text.secondary',
+                  fontSize: '13px',
+                  borderTop: '1px solid',
+                  borderColor: 'divider',
+                  pt: 1
+                }}>
+                  <Typography 
+                    variant="body2" 
+                    sx={{ 
+                      color: 'inherit',
+                      fontSize: 'inherit'
+                    }}
+                  >
+                    {event.location.address}
+                  </Typography>
+                  <Typography 
+                    variant="body2" 
+                    sx={{ 
+                      color: 'inherit',
+                      fontSize: 'inherit'
+                    }}
+                  >
+                    {event.date}
+                  </Typography>
+                </Box>
               </Box>
             </CardContent>
           </Card>
