@@ -22,7 +22,7 @@ import FilterListIcon from '@mui/icons-material/FilterList';
 import SearchIcon from '@mui/icons-material/Search';
 import CloseIcon from '@mui/icons-material/Close';
 import { DefaultTag, CustomTag, Tag } from '../types/Tag';
-import { Event } from '../types/Event';
+import { Event, Status } from '../types/Event';
 
 interface SearchAndFilterProps {
   events: Event[];
@@ -35,6 +35,7 @@ const SearchAndFilter: React.FC<SearchAndFilterProps> = (props) => {
   const { events, onFilterChange, selectedEvent, onResetSelection } = props;
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
+  const [selectedStatuses, setSelectedStatuses] = useState<Status[]>([]);
   const [customTagInput, setCustomTagInput] = useState('');
   const [dateRange, setDateRange] = useState('');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -43,15 +44,15 @@ const SearchAndFilter: React.FC<SearchAndFilterProps> = (props) => {
   const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const value = event.target.value;
     setSearchTerm(value);
-    filterEvents(value, selectedTags, dateRange);
+    filterEvents(value, selectedTags, dateRange, selectedStatuses);
   };
 
   const handleTagChange = (event: SelectChangeEvent<DefaultTag[]>) => {
     const value = event.target.value as DefaultTag[];
     const newTags = [...selectedTags.filter(tag => typeof tag !== 'string'), ...value];
     setSelectedTags(newTags);
-    filterEvents(searchTerm, newTags, dateRange);
-    updateActiveFiltersCount(newTags, dateRange);
+    filterEvents(searchTerm, newTags, dateRange, selectedStatuses);
+    updateActiveFiltersCount(newTags, dateRange, selectedStatuses);
   };
 
   const handleCustomTagAdd = (newValue: string | null) => {
@@ -64,8 +65,8 @@ const SearchAndFilter: React.FC<SearchAndFilterProps> = (props) => {
       const newTags = [...selectedTags, newCustomTag];
       setSelectedTags(newTags);
       setCustomTagInput('');
-      filterEvents(searchTerm, newTags, dateRange);
-      updateActiveFiltersCount(newTags, dateRange);
+      filterEvents(searchTerm, newTags, dateRange, selectedStatuses);
+      updateActiveFiltersCount(newTags, dateRange, selectedStatuses);
     }
   };
 
@@ -76,29 +77,42 @@ const SearchAndFilter: React.FC<SearchAndFilterProps> = (props) => {
         : tag.id !== (tagToDelete as CustomTag).id
     );
     setSelectedTags(newSelectedTags);
-    filterEvents(searchTerm, newSelectedTags, dateRange);
-    updateActiveFiltersCount(newSelectedTags, dateRange);
+    filterEvents(searchTerm, newSelectedTags, dateRange, selectedStatuses);
+    updateActiveFiltersCount(newSelectedTags, dateRange, selectedStatuses);
   };
 
   const handleDateRangeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const value = event.target.value;
     setDateRange(value);
-    filterEvents(searchTerm, selectedTags, value);
-    updateActiveFiltersCount(selectedTags, value);
+    filterEvents(searchTerm, selectedTags, value, selectedStatuses);
+    updateActiveFiltersCount(selectedTags, value, selectedStatuses);
   };
 
-  const updateActiveFiltersCount = (tags: Tag[], date: string) => {
+  const handleStatusChange = (event: SelectChangeEvent<Status[]>) => {
+    const value = event.target.value as Status[];
+    setSelectedStatuses(value);
+    filterEvents(searchTerm, selectedTags, dateRange, value);
+    updateActiveFiltersCount(selectedTags, dateRange, value);
+  };
+
+  const updateActiveFiltersCount = (
+    tags: Tag[],
+    date: string,
+    statuses: Status[]
+  ): void => {
     let count = 0;
     if (tags.length > 0) count += 1;
     if (date) count += 1;
+    if (statuses.length > 0) count += 1;
     setActiveFiltersCount(count);
   };
 
   const filterEvents = (
     search: string,
     tags: Tag[],
-    dateRangeValue: string
-  ) => {
+    dateRangeValue: string,
+    statuses: Status[]
+  ): void => {
     // Всегда начинаем с оригинального массива событий
     let filtered = [...events];
 
@@ -137,6 +151,11 @@ const SearchAndFilter: React.FC<SearchAndFilterProps> = (props) => {
       });
     }
 
+    // Фильтр по статусам
+    if (statuses.length > 0) {
+      filtered = filtered.filter(event => statuses.includes(event.status));
+    }
+
     // Убедимся, что у нас нет дубликатов перед отправкой
     const uniqueFiltered = filtered.filter((event, index, self) =>
       index === self.findIndex((e) => e.id === event.id)
@@ -155,10 +174,11 @@ const SearchAndFilter: React.FC<SearchAndFilterProps> = (props) => {
 
   const handleClearFilters = () => {
     setSelectedTags([]);
+    setSelectedStatuses([]);
     setDateRange('');
     setCustomTagInput('');
-    updateActiveFiltersCount([], '');
-    filterEvents(searchTerm, [], '');
+    updateActiveFiltersCount([], '', []);
+    filterEvents(searchTerm, [], '', []);
   };
 
   return (
@@ -235,6 +255,40 @@ const SearchAndFilter: React.FC<SearchAndFilterProps> = (props) => {
         </DialogTitle>
         <DialogContent dividers>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <FormControl fullWidth>
+              <InputLabel>Статус мероприятия</InputLabel>
+              <Select
+                multiple
+                value={selectedStatuses}
+                onChange={handleStatusChange}
+                input={<OutlinedInput label="Статус мероприятия" />}
+                renderValue={(selected) => (
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                    {selected.map((status) => (
+                      <Chip
+                        key={status}
+                        label={status === Status.COMINGUP ? 'Предстоящее' : 
+                               status === Status.UNDERWAY ? 'Текущее' : 'Прошедшее'}
+                        onDelete={() => {
+                          const newStatuses = selectedStatuses.filter(s => s !== status);
+                          setSelectedStatuses(newStatuses);
+                          filterEvents(searchTerm, selectedTags, dateRange, newStatuses);
+                          updateActiveFiltersCount(selectedTags, dateRange, newStatuses);
+                        }}
+                        onMouseDown={(event: React.MouseEvent<HTMLDivElement>) => {
+                          event.stopPropagation();
+                        }}
+                      />
+                    ))}
+                  </Box>
+                )}
+              >
+                <MenuItem value={Status.COMINGUP}>Предстоящее</MenuItem>
+                <MenuItem value={Status.UNDERWAY}>Текущее</MenuItem>
+                <MenuItem value={Status.HELD}>Прошедшее</MenuItem>
+              </Select>
+            </FormControl>
+
             <FormControl fullWidth>
               <InputLabel>Стандартные теги</InputLabel>
               <Select

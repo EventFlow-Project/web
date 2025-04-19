@@ -33,7 +33,7 @@ import { OrganizerUser, UserRole } from '../types/User';
 import { DefaultTag, CustomTag } from '../types/Tag';
 import EventList from '../components/EventList';
 import SearchAndFilter from '../components/SearchAndFilter';
-import Header from '../components/Header';
+import EventEditDialog from '../components/EventEditDialog';
 
 // Компонент для создания нового мероприятия
 const CreateEventForm: React.FC<{ 
@@ -109,9 +109,8 @@ const CreateEventForm: React.FC<{
     const newEvent: Event = {
       ...eventData as Event,
       id: Date.now().toString(),
-      tags: [...selectedDefaultTags, ...eventData.tags || []]
+      tags: [...selectedDefaultTags, ...(eventData.tags || [])]
     };
-    console.log(newEvent);
     handleCreateEvent(newEvent);
     onClose();
   };
@@ -119,6 +118,10 @@ const CreateEventForm: React.FC<{
   const handleTagChange = (event: SelectChangeEvent<DefaultTag[]>) => {
     const value = event.target.value as DefaultTag[];
     setSelectedDefaultTags(value);
+    setEventData(prev => ({
+      ...prev,
+      tags: [...value, ...(prev.tags?.filter((tag): tag is CustomTag => typeof tag !== 'string') || [])]
+    }));
   };
 
   const handleCustomTagAdd = () => {
@@ -139,6 +142,10 @@ const CreateEventForm: React.FC<{
   const handleTagDelete = (tagToDelete: DefaultTag | CustomTag) => {
     if (typeof tagToDelete === 'string') {
       setSelectedDefaultTags(prev => prev.filter(tag => tag !== tagToDelete));
+      setEventData(prev => ({
+        ...prev,
+        tags: prev.tags?.filter(tag => tag !== tagToDelete) || []
+      }));
     } else {
       setEventData(prev => ({
         ...prev,
@@ -368,13 +375,15 @@ const OrganizerProfilePage: React.FC = () => {
   const [mockUser, setMockUser] = useState<OrganizerUser>({
     id: '1',
     email: 'org@example.com',
-    displayName: 'Организатор мероприятий',
+    name: 'Организатор мероприятий',
     role: UserRole.ORGANIZER,
-    organizationName: 'Event Pro',
     description: 'Мы организуем лучшие мероприятия в городе',
-    activityArea: 'Организация конференций и фестивалей',
+    activity_area: 'Организация конференций и фестивалей',
+    created_at: '2024-01-01',
+    updated_at: '2024-01-01',
     events: [],
-    avatar: ''
+    avatar: '',
+    activityArea: 'Организация конференций и фестивалей'
   });
 
   const [events, setEvents] = useState<Event[]>([]);
@@ -460,235 +469,270 @@ const OrganizerProfilePage: React.FC = () => {
     setIsEditDialogOpen(false);
   };
 
+  const handleEditEvent = (event: Event) => {
+    setSelectedEvent(event);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleSaveEvent = (updatedEvent: Event) => {
+    setEvents(prev =>
+      prev.map(event =>
+        event.id === updatedEvent.id ? updatedEvent : event
+      )
+    );
+    setFilteredEvents(prev =>
+      prev.map(event =>
+        event.id === updatedEvent.id ? updatedEvent : event
+      )
+    );
+    setIsEditDialogOpen(false);
+    setSelectedEvent(null);
+  };
+
+  const handleDeleteEvent = () => {
+    if (selectedEvent) {
+      setEvents(prev => prev.filter(event => event.id !== selectedEvent.id));
+      setFilteredEvents(prev => prev.filter(event => event.id !== selectedEvent.id));
+      setIsEditDialogOpen(false);
+      setSelectedEvent(null);
+    }
+  };
+
   return (
-    <Box sx={{ 
-      minHeight: '100vh',
-      display: 'flex',
-      flexDirection: 'column'
-    }}>
-      <Header />
-      <main>
-        <Container maxWidth="lg" sx={{ mt: 2, mb: 4, flex: 1 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '24px' }}>
-            {/* Информация об организаторе */}
-            <div>
-              <Paper 
-                sx={{ 
-                  p: 3,
-                  boxShadow: 'none',
-                  border: '1px solid #e0e0e0',
-                  borderRadius: '8px'
-                }}
-              >
-                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 3 }}>
-                  <Box sx={{ position: 'relative' }}>
-                    <Avatar
-                      src={mockUser.avatar}
-                      sx={{ 
-                        width: 120, 
-                        height: 120, 
-                        mb: 2,
-                        border: '2px solid #e0e0e0'
-                      }}
-                    />
-                    <IconButton
-                      component="label"
-                      sx={{
-                        position: 'absolute',
-                        bottom: 0,
-                        right: 0,
-                        height: '30px',
-                        width: '30px',
-                        backgroundColor: 'white',
-                        border: '2px solid #e0e0e0',
-                        '&:hover': {
-                          backgroundColor: '#f5f5f5'
-                        }
-                      }}
-                    >
-                      <input
-                        type="file"
-                        hidden
-                        accept="image/*"
-                        onChange={handleAvatarChange}
-                      />
-                      <AddIcon />
-                    </IconButton>
-                  </Box>
-                  <Typography variant="h5">{mockUser.organizationName}</Typography>
-                  <Button
-                    variant="outlined"
-                    startIcon={<EditIcon />}
-                    onClick={handleEditProfile}
-                    sx={{ mt: 2 }}
-                  >
-                    Редактировать профиль
-                  </Button>
-                </Box>
-                <Typography variant="body1" paragraph>
-                  {mockUser.description}
-                </Typography>
-                <Typography variant="subtitle2" gutterBottom>
-                  Сфера деятельности:
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {mockUser.activityArea}
-                </Typography>
-              </Paper>
-            </div>
-
-            {/* Основной контент */}
-            <div>
-              <Paper 
-                sx={{ 
-                  p: 3,
-                  boxShadow: 'none',
-                  border: '1px solid #e0e0e0',
-                  borderRadius: '8px'
-                }}
-              >
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                  <Typography variant="h5">Мои мероприятия</Typography>
-                  <Button
-                    variant="contained"
-                    startIcon={<AddIcon />}
-                    onClick={() => setIsCreateDialogOpen(true)}
-                  >
-                    Создать мероприятие
-                  </Button>
-                </Box>
-
-                <Box sx={{ mb: 3 }}>
-                  <SearchAndFilter 
-                    events={filteredEvents} 
-                    onFilterChange={handleFilterChange}
-                    selectedEvent={selectedEvent}
-                    onResetSelection={handleResetSelection}
-                  />
-                </Box>
-
-                <Tabs value={tabValue} onChange={handleTabChange} sx={{ mb: 3 }}>
-                  <Tab label="Все" />
-                  <Tab label="Предстоящие" />
-                  <Tab label="Текущие" />
-                  <Tab label="Прошедшие" />
-                </Tabs>
-
-                <EventList events={filteredEvents} itemCountColumn={2} />
-              </Paper>
-            </div>
-          </div>
-
-          {/* Диалог создания мероприятия */}
-          <Dialog 
-            open={isCreateDialogOpen} 
-            onClose={() => setIsCreateDialogOpen(false)}
-            maxWidth="md"
-            fullWidth
-            PaperProps={{
-              sx: {
-                maxHeight: '90vh',
-                overflow: 'hidden'
-              }
-            }}
-          >
-            <DialogTitle>
-              Создание нового мероприятия
-              <IconButton
-                aria-label="close"
-                onClick={() => setIsCreateDialogOpen(false)}
-                sx={{
-                  position: 'absolute',
-                  right: 8,
-                  top: 8
-                }}
-              >
-                <CloseIcon />
-              </IconButton>
-            </DialogTitle>
-            <DialogContent 
+    <Container maxWidth="lg">
+      <Box sx={{ mt: 4, mb: 4 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '24px' }}>
+          {/* Информация об организаторе */}
+          <div>
+            <Paper 
               sx={{ 
-                overflowY: 'auto', 
-                padding: '20px',
-                '&:focus': {
-                  outline: 'none'
-                }
-              }}
-              onWheel={(e) => {
-                e.stopPropagation();
-                const target = e.currentTarget;
-                target.scrollTop += e.deltaY;
+                p: 3,
+                boxShadow: 'none',
+                border: '1px solid #e0e0e0',
+                borderRadius: '8px'
               }}
             >
-              <CreateEventForm 
-                onClose={() => setIsCreateDialogOpen(false)} 
-                handleCreateEvent={handleCreateEvent}
-                organizerName={mockUser.organizationName}
-              />
-            </DialogContent>
-          </Dialog>
+              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 3 }}>
+                <Box sx={{ position: 'relative' }}>
+                  <Avatar
+                    src={mockUser.avatar}
+                    sx={{ 
+                      width: 120, 
+                      height: 120, 
+                      mb: 2,
+                      border: '2px solid #e0e0e0'
+                    }}
+                  />
+                  <IconButton
+                    component="label"
+                    sx={{
+                      position: 'absolute',
+                      bottom: 0,
+                      right: 0,
+                      height: '30px',
+                      width: '30px',
+                      backgroundColor: 'white',
+                      border: '2px solid #e0e0e0',
+                      '&:hover': {
+                        backgroundColor: '#f5f5f5'
+                      }
+                    }}
+                  >
+                    <input
+                      type="file"
+                      hidden
+                      accept="image/*"
+                      onChange={handleAvatarChange}
+                    />
+                    <AddIcon />
+                  </IconButton>
+                </Box>
+                <Typography variant="h5">{mockUser.name}</Typography>
+                <Button
+                  variant="outlined"
+                  startIcon={<EditIcon />}
+                  onClick={handleEditProfile}
+                  sx={{ mt: 2 }}
+                >
+                  Редактировать профиль
+                </Button>
+              </Box>
+              <Typography variant="body1" paragraph>
+                {mockUser.description}
+              </Typography>
+              <Typography variant="subtitle2" gutterBottom>
+                Сфера деятельности:
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {mockUser.activityArea}
+              </Typography>
+            </Paper>
+          </div>
 
-          {/* Диалог редактирования профиля */}
-          <Dialog 
-            open={isEditDialogOpen} 
-            onClose={() => setIsEditDialogOpen(false)}
-            maxWidth="sm"
-            fullWidth
-          >
-            <DialogTitle>
-              Редактирование профиля
-              <IconButton
-                aria-label="close"
-                onClick={() => setIsEditDialogOpen(false)}
-                sx={{
-                  position: 'absolute',
-                  right: 8,
-                  top: 8
-                }}
-              >
-                <CloseIcon />
-              </IconButton>
-            </DialogTitle>
-            <DialogContent>
-              <Box sx={{ mt: 2 }}>
-                <TextField
-                  fullWidth
-                  label="Название организации"
-                  value={mockUser.organizationName}
-                  onChange={(e) => setMockUser(prev => ({ ...prev, organizationName: e.target.value }))}
-                  sx={{ mb: 2 }}
-                />
-                <TextField
-                  fullWidth
-                  multiline
-                  rows={3}
-                  label="Описание"
-                  value={mockUser.description}
-                  onChange={(e) => setMockUser(prev => ({ ...prev, description: e.target.value }))}
-                  sx={{ mb: 2 }}
-                />
-                <TextField
-                  fullWidth
-                  label="Сфера деятельности"
-                  value={mockUser.activityArea}
-                  onChange={(e) => setMockUser(prev => ({ ...prev, activityArea: e.target.value }))}
-                  sx={{ mb: 2 }}
+          {/* Основной контент */}
+          <div>
+            <Paper 
+              sx={{ 
+                p: 3,
+                boxShadow: 'none',
+                border: '1px solid #e0e0e0',
+                borderRadius: '8px'
+              }}
+            >
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Typography variant="h5">Мои мероприятия</Typography>
+                <Button
+                  variant="contained"
+                  startIcon={<AddIcon />}
+                  onClick={() => setIsCreateDialogOpen(true)}
+                >
+                  Создать мероприятие
+                </Button>
+              </Box>
+
+              <Box sx={{ mb: 3 }}>
+                <SearchAndFilter 
+                  events={filteredEvents} 
+                  onFilterChange={handleFilterChange}
+                  selectedEvent={selectedEvent}
+                  onResetSelection={handleResetSelection}
                 />
               </Box>
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={() => setIsEditDialogOpen(false)}>Отмена</Button>
-              <Button 
-                variant="contained" 
-                onClick={() => handleSaveProfile(mockUser)}
-              >
-                Сохранить
-              </Button>
-            </DialogActions>
-          </Dialog>
-        </Container>
-      </main>
-    </Box>
+
+              <Tabs value={tabValue} onChange={handleTabChange} sx={{ mb: 3 }}>
+                <Tab label="Все" />
+                <Tab label="Предстоящие" />
+                <Tab label="Текущие" />
+                <Tab label="Прошедшие" />
+              </Tabs>
+
+              <EventList 
+                events={filteredEvents} 
+                itemCountColumn={2} 
+                onEventClick={handleEditEvent}
+              />
+            </Paper>
+          </div>
+        </div>
+
+        {/* Диалог создания мероприятия */}
+        <Dialog 
+          open={isCreateDialogOpen} 
+          onClose={() => setIsCreateDialogOpen(false)}
+          maxWidth="md"
+          fullWidth
+          PaperProps={{
+            sx: {
+              maxHeight: '90vh',
+              overflow: 'hidden'
+            }
+          }}
+        >
+          <DialogTitle>
+            Создание нового мероприятия
+            <IconButton
+              aria-label="close"
+              onClick={() => setIsCreateDialogOpen(false)}
+              sx={{
+                position: 'absolute',
+                right: 8,
+                top: 8
+              }}
+            >
+              <CloseIcon />
+            </IconButton>
+          </DialogTitle>
+          <DialogContent 
+            sx={{ 
+              overflowY: 'auto', 
+              padding: '20px',
+              '&:focus': {
+                outline: 'none'
+              }
+            }}
+            onWheel={(e) => {
+              e.stopPropagation();
+              const target = e.currentTarget;
+              target.scrollTop += e.deltaY;
+            }}
+          >
+            <CreateEventForm 
+              onClose={() => setIsCreateDialogOpen(false)} 
+              handleCreateEvent={handleCreateEvent}
+              organizerName={mockUser.name}
+            />
+          </DialogContent>
+        </Dialog>
+
+        {/* Диалог редактирования профиля */}
+        <Dialog 
+          open={isEditDialogOpen} 
+          onClose={() => setIsEditDialogOpen(false)}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle>
+            Редактирование профиля
+            <IconButton
+              aria-label="close"
+              onClick={() => setIsEditDialogOpen(false)}
+              sx={{
+                position: 'absolute',
+                right: 8,
+                top: 8
+              }}
+            >
+              <CloseIcon />
+            </IconButton>
+          </DialogTitle>
+          <DialogContent>
+            <Box sx={{ mt: 2 }}>
+              <TextField
+                fullWidth
+                label="Название организации"
+                value={mockUser.name}
+                onChange={(e) => setMockUser(prev => ({ ...prev, name: e.target.value }))}
+                sx={{ mb: 2 }}
+              />
+              <TextField
+                fullWidth
+                multiline
+                rows={3}
+                label="Описание"
+                value={mockUser.description}
+                onChange={(e) => setMockUser(prev => ({ ...prev, description: e.target.value }))}
+                sx={{ mb: 2 }}
+              />
+              <TextField
+                fullWidth
+                label="Сфера деятельности"
+                value={mockUser.activityArea}
+                onChange={(e) => setMockUser(prev => ({ ...prev, activityArea: e.target.value }))}
+                sx={{ mb: 2 }}
+              />
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setIsEditDialogOpen(false)}>Отмена</Button>
+            <Button 
+              variant="contained" 
+              onClick={() => handleSaveProfile(mockUser)}
+            >
+              Сохранить
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Диалог редактирования мероприятия */}
+        <EventEditDialog
+          open={isEditDialogOpen}
+          onClose={() => setIsEditDialogOpen(false)}
+          event={selectedEvent}
+          onSave={handleSaveEvent}
+          onDelete={handleDeleteEvent}
+        />
+      </Box>
+    </Container>
   );
 };
 

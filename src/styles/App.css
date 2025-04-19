@@ -25,9 +25,29 @@ html {
   scroll-behavior: smooth;
 }
 
-/* Отступ для контента, чтобы не перекрывался с шапкой */
+/* Стили для анимаций */
+.page-transition {
+  position: relative;
+  width: 100%;
+  min-height: 100vh;
+  margin-top: 64px; /* Высота хедера */
+}
+
+/* Фиксируем хедер */
+header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background-color: white;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Добавляем отступ для контента под хедером */
 main {
-  padding-top: 64px; /* Высота шапки */
+  margin-top: 64px; /* Высота хедера */
+  padding: 20px;
 }
 
 /* Стили для главной страницы */

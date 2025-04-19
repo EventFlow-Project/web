@@ -7,20 +7,47 @@ import {
   TextField,
   Button,
   Box,
-  Link
+  Link,
+  Alert,
+  Snackbar
 } from '@mui/material';
+import { authService } from '../services/authService';
+import { userService } from '../services/userService';
+import { UserRole } from '../types/User';
 
 export const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Здесь будет логика авторизации
-    console.log('Login attempt:', { email, password });
-    // После успешной авторизации
-    navigate('/dashboard');
+    setError(null);
+    setIsLoading(true);
+
+    try {
+      await authService.login({ email, password });
+      const user = await userService.getCurrentUser();
+      
+      // Перенаправляем в зависимости от роли
+      switch (user.role) {
+        case UserRole.MODERATOR:
+          navigate('/moderator');
+          break;
+        case UserRole.ORGANIZER:
+          navigate('/organizer');
+          break;
+        default:
+          navigate('/profile');
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      setError('Ошибка авторизации. Проверьте email и пароль.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -75,8 +102,9 @@ export const LoginPage: React.FC = () => {
               fullWidth
               variant="contained"
               sx={{ mt: 3, mb: 2 }}
+              disabled={isLoading}
             >
-              Войти
+              {isLoading ? 'Вход...' : 'Войти'}
             </Button>
             <Box sx={{ textAlign: 'center' }}>
               <Link href="/register" variant="body2">
@@ -86,6 +114,16 @@ export const LoginPage: React.FC = () => {
           </Box>
         </Paper>
       </Box>
+      <Snackbar
+        open={!!error}
+        autoHideDuration={6000}
+        onClose={() => setError(null)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setError(null)} severity="error" sx={{ width: '100%' }}>
+          {error}
+        </Alert>
+      </Snackbar>
     </Container>
   );
 }; 

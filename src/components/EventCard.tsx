@@ -8,11 +8,31 @@ import {
   Box,
   CardMedia,
   IconButton,
-  keyframes
+  keyframes,
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  List,
+  ListItem,
+  ListItemAvatar,
+  ListItemText,
+  Avatar,
+  TextField,
+  InputAdornment,
+  Tooltip
 } from '@mui/material';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
+import CheckIcon from '@mui/icons-material/Check';
+import CloseIcon from '@mui/icons-material/Close';
+import PersonAddIcon from '@mui/icons-material/PersonAdd';
+import SearchIcon from '@mui/icons-material/Search';
 import { DefaultTag, defaultTagColors, CustomTag, DEFAULT_CUSTOM_TAG_COLOR } from '../types/Tag';
+import { Friend } from '../types/User';
+import { userService } from '../services/userService';
+import { authService } from '../services/authService';
 
 
 // Настройки эффекта волны
@@ -41,20 +61,91 @@ const rippleKeyframes = keyframes`
 `;
 
 
-export const EventCard: React.FC<{ event: Event }> = ({ event }) => {
+export const EventCard: React.FC<{ 
+  event: Event;
+  isInvitation?: boolean;
+  onAcceptInvitation?: (eventId: string) => void;
+  onDeclineInvitation?: (eventId: string) => void;
+  isFavorite?: boolean;
+  onToggleFavorite?: (eventId: string) => void;
+  friends?: Friend[];
+  onInviteFriend?: (eventId: string, friendId: string) => void;
+}> = ({ 
+  event,
+  isInvitation,
+  onAcceptInvitation,
+  onDeclineInvitation,
+  isFavorite = false,
+  onToggleFavorite,
+  friends = [],
+  onInviteFriend
+}) => {
     const [isFlipped, setIsFlipped] = useState(false);
-    const [isFavorite, setIsFavorite] = useState(false);
     const [showRipple, setShowRipple] = useState(false);
     const [lastClickTime, setLastClickTime] = useState(0);
-    const [backImage, setBackImage] = useState<HTMLImageElement | null>(null);
+    const [isHovered, setIsHovered] = useState(false);
+    const [imagesLoaded, setImagesLoaded] = useState(false);
+    const [frontImage, setFrontImage] = useState<string>(event.image || 'https://via.placeholder.com/300x200');
+    const [backImage, setBackImage] = useState<string>(event.location.image || 'https://via.placeholder.com/300x400');
+    const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [filteredFriends, setFilteredFriends] = useState<Friend[]>(friends);
+    const [isRegistered, setIsRegistered] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+    const isAuthenticated = authService.isAuthenticated();
   
     useEffect(() => {
-      const img = new Image();
-      img.src = event.location.image || 'https://via.placeholder.com/300x400';
-      img.onload = () => {
-        setBackImage(img);
+      setImagesLoaded(false);
+      
+      const loadImages = async () => {
+        try {
+          const frontImg = new Image();
+          const backImg = new Image();
+          
+          const frontLoadPromise = new Promise((resolve) => {
+            frontImg.onload = resolve;
+            frontImg.src = event.image || 'https://via.placeholder.com/300x200';
+          });
+          
+          const backLoadPromise = new Promise((resolve) => {
+            backImg.onload = resolve;
+            backImg.src = event.location.image || 'https://via.placeholder.com/300x400';
+          });
+          
+          await Promise.all([frontLoadPromise, backLoadPromise]);
+          
+          setFrontImage(event.image || 'https://via.placeholder.com/300x200');
+          setBackImage(event.location.image || 'https://via.placeholder.com/300x400');
+          setImagesLoaded(true);
+        } catch (error) {
+          console.error('Error loading images:', error);
+          setImagesLoaded(true);
+        }
       };
-    }, [event.location.image]);
+      
+      loadImages();
+    }, [event.image, event.location.image]);
+  
+    useEffect(() => {
+      setFilteredFriends(
+        friends.filter(friend =>
+          friend.displayName.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+      );
+    }, [searchTerm, friends]);
+  
+    useEffect(() => {
+      const checkRegistrationStatus = async () => {
+        try {
+          const status = await userService.getEventRegistrationStatus(event.id);
+          setIsRegistered(status);
+        } catch (error) {
+          console.error('Ошибка при проверке статуса записи:', error);
+        }
+      };
+
+      checkRegistrationStatus();
+    }, [event.id]);
   
     const getTagColor = (tag: DefaultTag | CustomTag) => {
       if (typeof tag === 'string') {
@@ -70,8 +161,10 @@ export const EventCard: React.FC<{ event: Event }> = ({ event }) => {
       return tag.name;
     };
   
-    const handleFavoriteToggle = () => {
-      setIsFavorite(!isFavorite);
+    const handleFavoriteToggle = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!isAuthenticated) return;
+      onToggleFavorite?.(event.id);
     };
   
     const triggerRippleEffect = () => {
@@ -82,16 +175,35 @@ export const EventCard: React.FC<{ event: Event }> = ({ event }) => {
     const handleCardClick = (e: React.MouseEvent<HTMLDivElement>) => {
       const currentTime = new Date().getTime();
       if (currentTime - lastClickTime < 300) {
-        handleFavoriteToggle();
+        handleFavoriteToggle(e);
         triggerRippleEffect();
       }
       setLastClickTime(currentTime);
     };
   
-    const handleIconClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const handleInviteFriend = (friendId: string) => {
+      if (!isAuthenticated) return;
+      onInviteFriend?.(event.id, friendId);
+      setIsInviteDialogOpen(false);
+    };
+  
+    const handleRegistration = async (e: React.MouseEvent) => {
       e.stopPropagation();
-      handleFavoriteToggle();
-      triggerRippleEffect();
+      if (!isAuthenticated) return;
+      setIsLoading(true);
+      try {
+        if (isRegistered) {
+          await userService.cancelEventRegistration(event.id);
+          setIsRegistered(false);
+        } else {
+          await userService.signUpForEvent(event.id);
+          setIsRegistered(true);
+        }
+      } catch (error) {
+        console.error('Ошибка при обновлении статуса записи:', error);
+      } finally {
+        setIsLoading(false);
+      }
     };
   
     return (
@@ -104,6 +216,8 @@ export const EventCard: React.FC<{ event: Event }> = ({ event }) => {
           WebkitUserSelect: 'none',
           MozUserSelect: 'none',
           msUserSelect: 'none',
+          opacity: imagesLoaded ? 1 : 0.7,
+          transition: 'opacity 0.3s ease-in-out',
           '&:hover': {
             '& .event-card': {
               boxShadow: '0 12px 24px rgba(0,0,0,0.15)'
@@ -112,6 +226,8 @@ export const EventCard: React.FC<{ event: Event }> = ({ event }) => {
         }}
         onClick={handleCardClick}
         onMouseDown={(e) => e.preventDefault()}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
       >
         {/* Эффект волны */}
         {showRipple && (
@@ -175,16 +291,15 @@ export const EventCard: React.FC<{ event: Event }> = ({ event }) => {
               position: 'relative',
               width: '100%',
               height: '100%',
-              transition: 'transform 0.8s cubic-bezier(0.4, 0, 0.2, 1)',
+              transition: 'transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
               transformStyle: 'preserve-3d',
-              transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)'
+              transform: isHovered ? 'rotateY(180deg)' : 'rotateY(0deg)',
+              willChange: 'transform'
             }
           }}
-          onMouseEnter={() => setIsFlipped(true)}
-          onMouseLeave={() => setIsFlipped(false)}
         >
           <Box className="flip-card-inner">
-            {/* Front of the card */}
+            {/* Передняя сторона карточки */}
             <Card
               className="event-card front"
               sx={{
@@ -203,16 +318,19 @@ export const EventCard: React.FC<{ event: Event }> = ({ event }) => {
                 overflow: 'hidden',
                 backgroundColor: 'white',
                 transform: 'rotateY(0deg)',
-                userSelect: 'none'
+                userSelect: 'none',
+                willChange: 'transform'
               }}
             >
               <Box sx={{ position: 'relative' }}>
                 <CardMedia
                   component="img"
                   height="300"
-                  image={event.image || 'https://via.placeholder.com/300x200'}
+                  image={frontImage}
                   sx={{ 
-                    borderRadius: '16px'
+                    borderRadius: '16px',
+                    transition: 'opacity 0.3s ease-in-out',
+                    opacity: imagesLoaded ? 1 : 0.7
                   }}
                 />
                 <Box
@@ -229,7 +347,6 @@ export const EventCard: React.FC<{ event: Event }> = ({ event }) => {
                     borderRadius: '10px',
                     width: 120,
                     height: 35,
-
                   }}>
                     {event.status}
                 </Box>
@@ -362,7 +479,7 @@ export const EventCard: React.FC<{ event: Event }> = ({ event }) => {
               </CardContent>
             </Card>
   
-            {/* Back of the card */}
+            {/* Задняя сторона карточки */}
             <Card
               className="event-card back"
               sx={{
@@ -381,7 +498,8 @@ export const EventCard: React.FC<{ event: Event }> = ({ event }) => {
                 overflow: 'hidden',
                 backgroundColor: 'white',
                 transform: 'rotateY(180deg)',
-                '-webkit-transform-style': 'preserve-3d'
+                userSelect: 'none',
+                willChange: 'transform'
               }}
             >
               <Box 
@@ -399,11 +517,12 @@ export const EventCard: React.FC<{ event: Event }> = ({ event }) => {
                     left: 0,
                     width: '100%',
                     height: '100%',
-                    backgroundImage: `url(${event.location.image || 'https://via.placeholder.com/300x400'})`,
+                    backgroundImage: `url(${backImage})`,
                     backgroundSize: 'cover',
                     backgroundPosition: 'center',
                     borderRadius: '16px',
-                    visibility: backImage ? 'visible' : 'hidden'
+                    transition: 'opacity 0.3s ease-in-out',
+                    opacity: imagesLoaded ? 1 : 0.7
                   }}
                 />
                 <Box
@@ -430,9 +549,116 @@ export const EventCard: React.FC<{ event: Event }> = ({ event }) => {
                   <Typography variant="body2">
                     Продолжительность: {event.duration}
                   </Typography>
+                  <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
+                    {isInvitation ? (
+                      <>
+                        <Tooltip title={!isAuthenticated ? "Для взаимодействия необходимо авторизоваться" : ""}>
+                          <span>
+                            <Button
+                              variant="outlined"
+                              startIcon={<CheckIcon />}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (!isAuthenticated) return;
+                                onAcceptInvitation?.(event.id);
+                              }}
+                              disabled={!isAuthenticated}
+                              sx={{
+                                flex: 1,
+                                color: 'white',
+                                borderColor: 'white',
+                                '&:hover': {
+                                  borderColor: 'white',
+                                  backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                                }
+                              }}
+                            >
+                              Принять
+                            </Button>
+                          </span>
+                        </Tooltip>
+                        <Tooltip title={!isAuthenticated ? "Для взаимодействия необходимо авторизоваться" : ""}>
+                          <span>
+                            <Button
+                              variant="outlined"
+                              startIcon={<CloseIcon />}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (!isAuthenticated) return;
+                                onDeclineInvitation?.(event.id);
+                              }}
+                              disabled={!isAuthenticated}
+                              sx={{
+                                flex: 1,
+                                color: 'white',
+                                borderColor: 'white',
+                                '&:hover': {
+                                  borderColor: 'white',
+                                  backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                                }
+                              }}
+                            >
+                              Отклонить
+                            </Button>
+                          </span>
+                        </Tooltip>
+                      </>
+                    ) : (
+                      <>
+                        <Tooltip title={!isAuthenticated ? "Для записи на мероприятие необходимо авторизоваться" : ""}>
+                          <span>
+                            <Button
+                              variant={isRegistered ? "outlined" : "contained"}
+                              color={isRegistered ? "error" : "primary"}
+                              onClick={handleRegistration}
+                              disabled={isLoading || !isAuthenticated}
+                              sx={{
+                                flex: 1,
+                                backgroundColor: isRegistered ? 'transparent' : 'rgba(255, 255, 255, 0.9)',
+                                color: isRegistered ? 'white' : 'primary.main',
+                                borderColor: isRegistered ? 'white' : 'transparent',
+                                '&:hover': {
+                                  backgroundColor: isRegistered ? 'rgba(255, 255, 255, 0.1)' : 'white',
+                                  borderColor: 'white'
+                                }
+                              }}
+                            >
+                              {isRegistered ? 'Отменить запись' : 'Записаться'}
+                            </Button>
+                          </span>
+                        </Tooltip>
+                        <Tooltip title={!isAuthenticated ? "Для приглашения друзей необходимо авторизоваться" : ""}>
+                          <span>
+                            <Button
+                              variant="outlined"
+                              startIcon={<PersonAddIcon />}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (!isAuthenticated) return;
+                                setIsInviteDialogOpen(true);
+                              }}
+                              disabled={!isAuthenticated}
+                              sx={{
+                                flex: 1,
+                                color: 'white',
+                                borderColor: 'white',
+                                '&:hover': {
+                                  borderColor: 'white',
+                                  backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                                }
+                              }}
+                            >
+                              Пригласить друга
+                            </Button>
+                          </span>
+                        </Tooltip>
+                      </>
+                    )}
+                  </Box>
                 </Box>
                 <IconButton
-                  onClick={handleIconClick}
+                  onClick={handleFavoriteToggle}
+                  disabled={!isAuthenticated}
                   sx={{
                     position: 'absolute',
                     top: 16,
@@ -458,6 +684,58 @@ export const EventCard: React.FC<{ event: Event }> = ({ event }) => {
             </Card>
           </Box>
         </Box>
+
+        {/* Диалог выбора друга для приглашения */}
+        <Dialog 
+          open={isInviteDialogOpen} 
+          onClose={() => setIsInviteDialogOpen(false)}
+          maxWidth="sm"
+          fullWidth
+          onClick={(e) => e.stopPropagation()}
+        >
+          <DialogTitle>Пригласить друга</DialogTitle>
+          <DialogContent>
+            <TextField
+              fullWidth
+              placeholder="Поиск друзей"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              sx={{ mb: 2, mt: 1 }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon />
+                  </InputAdornment>
+                )
+              }}
+            />
+            <List sx={{ pt: 0 }}>
+              {filteredFriends.map((friend) => (
+                <ListItem
+                  key={friend.id}
+                  onClick={() => handleInviteFriend(friend.id)}
+                  sx={{ cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.04)' } }}
+                >
+                  <ListItemAvatar>
+                    <Avatar src={friend.avatar} alt={friend.displayName} />
+                  </ListItemAvatar>
+                  <ListItemText 
+                    primary={friend.displayName}
+                    secondary={`Общих мероприятий: ${friend.mutualEvents.length}`}
+                  />
+                </ListItem>
+              ))}
+              {filteredFriends.length === 0 && (
+                <ListItem>
+                  <ListItemText primary="Друзья не найдены" />
+                </ListItem>
+              )}
+            </List>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setIsInviteDialogOpen(false)}>Закрыть</Button>
+          </DialogActions>
+        </Dialog>
       </Box>
     );
   };

@@ -12,17 +12,25 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  SelectChangeEvent
+  SelectChangeEvent,
+  Alert,
+  Snackbar
 } from '@mui/material';
+import { authService } from '../services/authService';
+import { UserRole } from '../types/User';
+import { userService } from '../services/userService';
 
 export const RegisterPage: React.FC = () => {
   const [formData, setFormData] = useState({
     email: '',
-    displayName: '',
+    name: '',
     password: '',
-    role: 'participant',
-    organizationInfo: '',
+    role: UserRole.PARTICIPANT,
+    description: '',
+    activityArea: '',
   });
+  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -37,16 +45,60 @@ export const RegisterPage: React.FC = () => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: value as UserRole
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const validateForm = (): boolean => {
+    if (!formData.email || !/\S+@\S+\.\S+/.test(formData.email)) {
+      setError('Введите корректный email');
+      return false;
+    }
+    if (!formData.password || formData.password.length < 6) {
+      setError('Пароль должен быть не менее 6 символов');
+      return false;
+    }
+    if (!formData.name) {
+      setError('Введите ваше имя');
+      return false;
+    }
+    if (formData.role === UserRole.ORGANIZER && (!formData.description || !formData.activityArea)) {
+      setError('Для организатора необходимо заполнить все поля');
+      return false;
+    }
+    return true;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Здесь будет логика регистрации
-    console.log('Registration attempt:', formData);
-    // После успешной регистрации
-    navigate('/dashboard');
+    setError(null);
+
+    if (!validateForm()) {
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await authService.register(formData);
+      const user = await userService.getCurrentUser();
+      
+      // Перенаправляем в зависимости от роли
+      switch (user.role) {
+        case 'MODERATOR':
+          navigate('/moderator');
+          break;
+        case 'ORGANIZER':
+          navigate('/organizer');
+          break;
+        default:
+          navigate('/profile');
+      }
+    } catch (error) {
+      console.log(error);
+      setError('Ошибка регистрации!');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -89,10 +141,10 @@ export const RegisterPage: React.FC = () => {
               margin="normal"
               required
               fullWidth
-              id="displayName"
-              label="Отображаемое имя"
-              name="displayName"
-              value={formData.displayName}
+              id="name"
+              label="Имя"
+              name="name"
+              value={formData.name}
               onChange={handleChange}
             />
             <TextField
@@ -117,31 +169,45 @@ export const RegisterPage: React.FC = () => {
                 label="Роль"
                 onChange={handleSelectChange}
               >
-                <MenuItem value="participant">Участник</MenuItem>
-                <MenuItem value="organizer">Организатор</MenuItem>
+                <MenuItem value={UserRole.PARTICIPANT}>Участник</MenuItem>
+                <MenuItem value={UserRole.ORGANIZER}>Организатор</MenuItem>
               </Select>
             </FormControl>
-            {formData.role === 'organizer' && (
-              <TextField
-                margin="normal"
-                required
-                fullWidth
-                multiline
-                rows={4}
-                name="organizationInfo"
-                label="Информация об организации"
-                id="organizationInfo"
-                value={formData.organizationInfo}
-                onChange={handleChange}
-              />
+            {formData.role === UserRole.ORGANIZER && (
+              <>
+                <TextField
+                  margin="normal"
+                  required
+                  fullWidth
+                  multiline
+                  rows={4}
+                  name="description"
+                  label="Описание"
+                  id="description"
+                  value={formData.description}
+                  onChange={handleChange}
+                />
+                <TextField
+                  margin="normal"
+                  required
+                  fullWidth
+                  name="activityArea"
+                  label="Сфера деятельности"
+                  id="activityArea"
+                  value={formData.activityArea}
+                  onChange={handleChange}
+                  placeholder="Например: Организация конференций и фестивалей"
+                />
+              </>
             )}
             <Button
               type="submit"
               fullWidth
               variant="contained"
               sx={{ mt: 3, mb: 2 }}
+              disabled={isLoading}
             >
-              Зарегистрироваться
+              {isLoading ? 'Регистрация...' : 'Зарегистрироваться'}
             </Button>
             <Box sx={{ textAlign: 'center' }}>
               <Link href="/login" variant="body2">
@@ -151,6 +217,16 @@ export const RegisterPage: React.FC = () => {
           </Box>
         </Paper>
       </Box>
+      <Snackbar
+        open={!!error}
+        autoHideDuration={6000}
+        onClose={() => setError(null)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setError(null)} severity="error" sx={{ width: '100%' }}>
+          {error}
+        </Alert>
+      </Snackbar>
     </Container>
   );
 }; 

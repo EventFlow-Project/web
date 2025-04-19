@@ -2,10 +2,12 @@ import React from 'react';
 import { AppBar, Toolbar, Button, Box } from '@mui/material';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import logo from '../assets/images/logo.png';
+import { authService } from '../services/authService';
 
 const Header: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const isAuthenticated = authService.isAuthenticated();
 
   const smoothScroll = (element: HTMLElement | null) => {
     if (!element) return;
@@ -39,11 +41,34 @@ const Header: React.FC = () => {
     requestAnimationFrame(animation);
   };
 
+  const scrollToTop = () => {
+    const startPosition = window.pageYOffset;
+    const duration = 500;
+    let start: number | null = null;
+
+    const animation = (currentTime: number) => {
+      if (start === null) start = currentTime;
+      const timeElapsed = currentTime - start;
+      const progress = Math.min(timeElapsed / duration, 1);
+      
+      const easeInOutCubic = (t: number) => {
+        return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      };
+
+      window.scrollTo(0, startPosition * (1 - easeInOutCubic(progress)));
+
+      if (timeElapsed < duration) {
+        requestAnimationFrame(animation);
+      }
+    };
+
+    requestAnimationFrame(animation);
+  };
+
   const handleHomeClick = (e: React.MouseEvent) => {
     e.preventDefault();
     if (location.pathname === '/') {
-      const topMap = document.getElementById('top-map');
-      smoothScroll(topMap);
+      scrollToTop();
     } else {
       navigate('/');
     }
@@ -52,8 +77,7 @@ const Header: React.FC = () => {
   const handleLogoClick = (e: React.MouseEvent) => {
     e.preventDefault();
     if (location.pathname === '/') {
-      const topMap = document.getElementById('top-map');
-      smoothScroll(topMap);
+      scrollToTop();
     } else {
       navigate('/');
     }
@@ -65,6 +89,11 @@ const Header: React.FC = () => {
       const eventsSection = document.getElementById('events-section');
       smoothScroll(eventsSection);
     }
+  };
+
+  const handleLogout = () => {
+    authService.logout();
+    navigate('/');
   };
 
   return (
@@ -113,20 +142,32 @@ const Header: React.FC = () => {
         </Box>
 
         <Box sx={{ display: 'flex', gap: 2 }}>
-          <Button 
-            component={Link} 
-            to="/profile/organizer" 
-            sx={{ color: 'black', textTransform: 'none' }}
-          >
-            Профиль
-          </Button>
-          <Button 
-            component={Link} 
-            to="/login" 
-            sx={{ color: 'black', textTransform: 'none' }}
-          >
-            Войти
-          </Button>
+          {isAuthenticated && (
+            <>
+              <Button 
+                component={Link} 
+                to="/profile" 
+                sx={{ color: 'black', textTransform: 'none' }}
+              >
+                Профиль
+              </Button>
+              <Button 
+                onClick={handleLogout}
+                sx={{ color: 'black', textTransform: 'none' }}
+              >
+                Выйти
+              </Button>
+            </>
+          )}
+          {!isAuthenticated && (
+            <Button 
+              component={Link} 
+              to="/login" 
+              sx={{ color: 'black', textTransform: 'none' }}
+            >
+              Войти
+            </Button>
+          )}
         </Box>
       </Toolbar>
     </AppBar>

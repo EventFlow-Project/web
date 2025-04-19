@@ -1,15 +1,37 @@
+import { Event } from './Event';
+
 export enum UserRole {
   ADMIN = 'ADMIN',
   ORGANIZER = 'ORGANIZER',
-  PARTICIPANT = 'PARTICIPANT'
+  PARTICIPANT = 'PARTICIPANT',
+  MODERATOR = 'MODERATOR'
 }
 
-export interface BaseUser {
-  id: string;
+export enum PrivacySetting {
+  PUBLIC = 'PUBLIC',
+  FRIENDS_ONLY = 'FRIENDS_ONLY',
+  PRIVATE = 'PRIVATE'
+}
+
+export interface UpdateUser {
   email: string;
-  displayName: string;
-  avatar?: string;
+  name: string;
+  avatar: string;
+}
+
+export interface BaseUserInfo {
+  email: string;
+  name: string;
+  avatar: string;
   role: UserRole;
+  description: string;
+  activity_area: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BaseUser extends BaseUserInfo {
+  id: string;
 }
 
 export interface AdminUser extends BaseUser {
@@ -18,15 +40,38 @@ export interface AdminUser extends BaseUser {
 
 export interface ParticipantUser extends BaseUser {
   role: UserRole.PARTICIPANT;
-  interests?: string[];
 }
 
 export interface OrganizerUser extends BaseUser {
   role: UserRole.ORGANIZER;
-  organizationName: string;
   description: string;
   activityArea: string;
   events: string[]; // массив ID мероприятий
+}
+
+export interface Friend {
+  id: string;
+  displayName: string;
+  avatar: string;
+  mutualEvents: string[]; // массив ID общих мероприятий
+}
+
+export interface EventInvitation {
+  event: Event;
+  fromFriend: Friend;
+}
+
+export interface UserPrivacySettings {
+  eventsVisibility: PrivacySetting;
+  friendsListVisibility: PrivacySetting;
+}
+
+export interface SocialUser extends BaseUser {
+  friends: Friend[];
+  pendingFriendRequests: Friend[];
+  eventInvitations: EventInvitation[];
+  privacySettings: UserPrivacySettings;
+  events: string[]; // массив ID мероприятий пользователя
 }
 
 export type User = AdminUser | OrganizerUser | ParticipantUser;

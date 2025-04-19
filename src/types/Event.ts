@@ -21,7 +21,12 @@ export interface Event {
   duration: string;
   organizer: string;
   status: Status;
-  location: Location;
+  location: {
+    lat: number;
+    lng: number;
+    address: string;
+    image?: string;
+  };
   tags: Tag[];
-  image?: string; // URL изображения лицевой стороны
+  image?: string;
 } 

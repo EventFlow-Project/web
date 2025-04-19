@@ -1,64 +1,51 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { ThemeProvider } from '@mui/material/styles';
 import HomePage from './pages/HomePage';
-import { CssBaseline } from '@mui/material';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
+import UserProfile from './pages/UserProfile';
+import ModeratorProfilePage from './pages/ModeratorProfilePage';
 import OrganizerProfilePage from './pages/OrganizerProfilePage';
-import theme from './theme';
-import './styles/App.css';
+import Header from './components/Header';
+import ProtectedRoute from './components/ProtectedRoute';
+import { UserRole } from './types/User';
 
-function App() {
-  useEffect(() => {
-    const handleWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      
-      // Функция для плавного замедления
-      const easeOutCubic = (t: number) => {
-        return 1 - Math.pow(1 - t, 3);
-      };
-
-      const scrollAmount = e.deltaY * 3; // Уменьшаем скорость еще больше
-      const duration = 800; // Увеличиваем длительность анимации
-      const startPosition = window.pageYOffset;
-      let start: number | null = null;
-
-      const animation = (currentTime: number) => {
-        if (start === null) start = currentTime;
-        const timeElapsed = currentTime - start;
-        const progress = Math.min(timeElapsed / duration, 1);
-        
-        window.scrollTo(0, startPosition + scrollAmount * easeOutCubic(progress));
-
-        if (timeElapsed < duration) {
-          requestAnimationFrame(animation);
-        }
-      };
-
-      requestAnimationFrame(animation);
-    };
-
-    document.addEventListener('wheel', handleWheel, { passive: false });
-
-    return () => {
-      document.removeEventListener('wheel', handleWheel);
-    };
-  }, []);
-
+const App: React.FC = () => {
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <Router>
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/profile/organizer" element={<OrganizerProfilePage />} />
-        </Routes>
-      </Router>
-    </ThemeProvider>
+    <Router>
+      <Header />
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route 
+          path="/profile" 
+          element={
+            <ProtectedRoute>
+              <UserProfile />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/moderator" 
+          element={
+            <ProtectedRoute allowedRoles={[UserRole.MODERATOR]}>
+              <ModeratorProfilePage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/organizer" 
+          element={
+            <ProtectedRoute allowedRoles={[UserRole.ORGANIZER]}>
+              <OrganizerProfilePage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route path="*" element={<div>Страница не найдена</div>} />
+      </Routes>
+    </Router>
   );
-}
+};
 
-export default App;
+export default App; 
