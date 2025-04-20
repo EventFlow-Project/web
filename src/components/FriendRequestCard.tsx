@@ -2,52 +2,65 @@ import React from 'react';
 import {
   Card,
   CardContent,
-  CardMedia,
   Typography,
   Box,
   Button,
+  Avatar,
 } from '@mui/material';
 import { Friend } from '../types/User';
+import PersonIcon from '@mui/icons-material/Person';
 
 interface FriendRequestCardProps {
-  request: Friend;
+  friend: Friend;
   onAccept: (userId: string) => void;
   onReject: (userId: string) => void;
 }
 
 export const FriendRequestCard: React.FC<FriendRequestCardProps> = ({
-  request,
+  friend,
   onAccept,
   onReject,
 }) => {
   return (
     <Card sx={{ maxWidth: 300, m: 1 }}>
-      <CardMedia
-        component="img"
-        height="200"
-        image={request.avatar || 'https://i.pravatar.cc/300'}
-        alt={request.displayName}
-      />
+      <Box sx={{ 
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: 200,
+        bgcolor: 'grey.100',
+        p: 2
+      }}>
+        <Avatar
+          src={friend.avatar}
+          alt={friend.name}
+          sx={{
+            width: 120,
+            height: 120,
+            bgcolor: 'grey.300'
+          }}
+        >
+          <PersonIcon sx={{ fontSize: 60 }} />
+        </Avatar>
+      </Box>
       <CardContent>
         <Typography variant="h6" component="div" gutterBottom>
-          {request.displayName}
+          {friend.name}
         </Typography>
-        <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-          <Button
-            variant="outlined"
-            color="error"
-            size="small"
-            onClick={() => onReject(request.id)}
-          >
-            Отклонить
-          </Button>
+        <Box sx={{ display: 'flex', gap: 1 }}>
           <Button
             variant="contained"
             color="primary"
-            size="small"
-            onClick={() => onAccept(request.id)}
+            onClick={() => onAccept(friend.id)}
           >
             Принять
+          </Button>
+          <Button
+            variant="outlined"
+            color="error"
+            onClick={() => onReject(friend.id)}
+          >
+            Отклонить
           </Button>
         </Box>
       </CardContent>

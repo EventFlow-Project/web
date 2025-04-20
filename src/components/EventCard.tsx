@@ -129,23 +129,14 @@ export const EventCard: React.FC<{
     useEffect(() => {
       setFilteredFriends(
         friends.filter(friend =>
-          friend.displayName.toLowerCase().includes(searchTerm.toLowerCase())
+            friend.name.toLowerCase().includes(searchTerm.toLowerCase())
         )
       );
     }, [searchTerm, friends]);
   
     useEffect(() => {
-      const checkRegistrationStatus = async () => {
-        try {
-          const status = await userService.getEventRegistrationStatus(event.id);
-          setIsRegistered(status);
-        } catch (error) {
-          console.error('Ошибка при проверке статуса записи:', error);
-        }
-      };
-
-      checkRegistrationStatus();
-    }, [event.id]);
+      setIsRegistered(isAuthenticated);
+    }, [isAuthenticated]);
   
     const getTagColor = (tag: DefaultTag | CustomTag) => {
       if (typeof tag === 'string') {
@@ -717,11 +708,10 @@ export const EventCard: React.FC<{
                   sx={{ cursor: 'pointer', '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.04)' } }}
                 >
                   <ListItemAvatar>
-                    <Avatar src={friend.avatar} alt={friend.displayName} />
+                    <Avatar src={friend.avatar} alt={friend.name} />
                   </ListItemAvatar>
                   <ListItemText 
-                    primary={friend.displayName}
-                    secondary={`Общих мероприятий: ${friend.mutualEvents.length}`}
+                    primary={friend.name}
                   />
                 </ListItem>
               ))}

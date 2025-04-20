@@ -24,24 +24,25 @@ const DefaultIcon = L.icon({
 
 L.Marker.prototype.options.icon = DefaultIcon;
 
-const img = `${process.env.PUBLIC_URL}test.jpg`;
+const img1 = `${process.env.PUBLIC_URL}test.jpg`;
+const img3 = `${process.env.PUBLIC_URL}test3.jpg`;
 
 const HomePage: React.FC = () => {
   const [allEvents] = useState<Event[]>([
     {
       id: '1',
-      title: "1",
-      description: "Жесткое пати где всем рады, влетайте и не залетайте\n(весь набор первой помощи имеется)",
+      title: "Крутое пати",
+      description: "Готовьтесь к взрывной вечеринке! Вас ждет ночь полная энергии: зажигательная музыка, яркие световые шоу ",
       date: "2025-01-05T18:49",
-      duration: "1 час",
-      organizer: "Хурма1",
+      duration: " 20:00 – 02:00",
+      organizer: "Аккакий Аккакиевич",
       status: Status.COMINGUP,
-      image: img,
+      image: img1,
       location: {
         lat: 55.755244,
         lng: 37.618823,
-        address: "Подвал Джейсона Вурхиза",
-        image: img
+        address: "«Звездный», Кемский переулок, Санкт-Петербург",
+        image: img1
       },
       tags: [
         DefaultTag.CONFERENCE,
@@ -60,28 +61,43 @@ const HomePage: React.FC = () => {
       ],
     },
     {
-      id: '2',
-      title: "2",
-      description: "Жесткое пати где всем рады, влетайте и не залетайте\n(весь набор первой помощи имеется)",
-      date: "2025-02-05T18:49",
-      duration: "1 час",
-      organizer: "Хурма2",
-      status: Status.COMINGUP,
-      image: img,
-      location: {
-        lat: 55.751394,
-        lng: 37.618493,
-        address: "Подвал Джейсона Вурхиза",
-        image: img
+      "id": "3",
+      "title": "Ретро-волна 80-х",
+      "description": "Зажгите на вечеринке 80-х! Танцы под хиты Синди Лаупер и Майкла Джексона, неон, ретро-фотозона, коктейли. Наденьте яркие лосины и вернитесь в эпоху диско! #РетроВолна",
+      "date": "24.03.2025 20:00",
+      "duration": "20:00 – 04:00",
+      "organizer": "RetroVibes Events",
+      "status": Status.HELD,
+      "image": img3,
+      "location": {
+        "lat": 59.986079,
+        "lng": 30.285837,
+        "address": "Клуб «Винил», ул. Савушкина, 21, Санкт-Петербург",
+        "image": img3
       },
-      tags: [
-        DefaultTag.CONFERENCE,
+      "tags": [
+        DefaultTag.OFFLINE,
         {
-          id: 'custom1',
-          name: 'писюн',
-          isCustom: true
-        } as CustomTag
-      ],
+          "id": "custom1",
+          "name": "РетроВолна",
+          "isCustom": true
+        },
+        {
+          "id": "custom2",
+          "name": "СанктПетербург",
+          "isCustom": true
+        },
+        {
+          "id": "custom3",
+          "name": "Винил",
+          "isCustom": true
+        },
+        {
+          "id": "custom4",
+          "name": "Музыка80х",
+          "isCustom": true
+        }
+      ]
     }
   ]);
 
@@ -155,6 +171,7 @@ const HomePage: React.FC = () => {
           center={[55.751244, 37.618423]}
           zoom={13}
           style={{ height: '100%', width: '100%' }}
+          attributionControl={false}
         >
           <TileLayer
             url="https://core-renderer-tiles.maps.yandex.net/tiles?l=map&v=23.03.14-0-b230320170451&x={x}&y={y}&z={z}&scale=1&lang=ru_RU"

@@ -500,7 +500,7 @@ const OrganizerProfilePage: React.FC = () => {
 
   return (
     <Container maxWidth="lg">
-      <Box sx={{ mt: 4, mb: 4 }}>
+      <Box sx={{ mt: 15, mb: 4 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '24px' }}>
           {/* Информация об организаторе */}
           <div>

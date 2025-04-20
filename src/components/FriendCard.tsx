@@ -22,13 +22,13 @@ export const FriendCard: React.FC<FriendCardProps> = ({ friend, onRemove }) => {
       <CardMedia
         component="img"
         height="200"
-        image={friend.avatar || 'https://i.pravatar.cc/300'}
-        alt={friend.displayName}
+        image={friend.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(friend.name)}&background=random&color=fff&size=300`}
+        alt={friend.name}
       />
       <CardContent>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
           <Typography variant="h6" component="div">
-            {friend.displayName}
+            {friend.name}
           </Typography>
           <IconButton 
             onClick={() => onRemove(friend.id)}
@@ -38,12 +38,6 @@ export const FriendCard: React.FC<FriendCardProps> = ({ friend, onRemove }) => {
             <PersonRemoveIcon />
           </IconButton>
         </Box>
-        <Chip
-          label={`Общих мероприятий: ${friend.mutualEvents.length}`}
-          size="small"
-          color="primary"
-          variant="outlined"
-        />
       </CardContent>
     </Card>
   );

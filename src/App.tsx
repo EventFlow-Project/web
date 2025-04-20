@@ -7,7 +7,7 @@ import UserProfile from './pages/UserProfile';
 import ModeratorProfilePage from './pages/ModeratorProfilePage';
 import OrganizerProfilePage from './pages/OrganizerProfilePage';
 import Header from './components/Header';
-import ProtectedRoute from './components/ProtectedRoute';
+// import ProtectedRoute from './components/ProtectedRoute'; // Закомментируем импорт
 import { UserRole } from './types/User';
 
 const App: React.FC = () => {
@@ -21,25 +21,25 @@ const App: React.FC = () => {
         <Route 
           path="/profile" 
           element={
-            <ProtectedRoute>
+            // <ProtectedRoute allowedRoles={[UserRole.PARTICIPANT, UserRole.ORGANIZER, UserRole.MODERATOR]}>
               <UserProfile />
-            </ProtectedRoute>
+            // </ProtectedRoute>
           } 
         />
         <Route 
           path="/moderator" 
           element={
-            <ProtectedRoute allowedRoles={[UserRole.MODERATOR]}>
+            // <ProtectedRoute allowedRoles={[UserRole.MODERATOR]}>
               <ModeratorProfilePage />
-            </ProtectedRoute>
+            // </ProtectedRoute>
           } 
         />
         <Route 
           path="/organizer" 
           element={
-            <ProtectedRoute allowedRoles={[UserRole.ORGANIZER]}>
+            // <ProtectedRoute allowedRoles={[UserRole.ORGANIZER]}>
               <OrganizerProfilePage />
-            </ProtectedRoute>
+            // </ProtectedRoute>
           } 
         />
         <Route path="*" element={<div>Страница не найдена</div>} />

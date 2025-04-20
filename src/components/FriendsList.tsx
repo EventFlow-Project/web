@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -7,19 +7,21 @@ import {
   Tabs,
   Tab,
   Paper,
+  CircularProgress,
 } from '@mui/material';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
-import { Friend, EventInvitation } from '../types/User';
+import { Friend, EventInvitation, SocialUser } from '../types/User';
 import { Event } from '../types/Event';
 import { FriendCard } from './FriendCard';
 import { FriendRequestCard } from './FriendRequestCard';
 import EventList from './EventList';
+import { AddFriendDialog } from './AddFriendDialog';
+import { EventInvitationCard } from './EventInvitationCard';
+import { userService } from '../services/userService';
 
 interface FriendsListProps {
-  friends: Friend[];
-  pendingRequests: Friend[];
-  eventInvitations: EventInvitation[];
-  onAddFriend: () => void;
+  eventInvitations: SocialUser['eventInvitations'];
+  onAddFriend: (friendId: string) => void;
   onAcceptRequest: (userId: string) => void;
   onRejectRequest: (userId: string) => void;
   onRemoveFriend: (friendId: string) => void;
@@ -52,130 +54,131 @@ function TabPanel(props: TabPanelProps) {
 }
 
 export const FriendsList: React.FC<FriendsListProps> = ({
-  friends,
-  pendingRequests,
   eventInvitations,
-  onAddFriend,
   onAcceptRequest,
   onRejectRequest,
   onRemoveFriend,
   onAcceptInvitation,
   onDeclineInvitation,
-  favoriteEvents,
-  onToggleFavorite,
 }) => {
-  const [activeTab, setActiveTab] = React.useState(0);
+  const [activeTab, setActiveTab] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const [friends, setFriends] = useState<Friend[]>([]);
+  const [pendingRequests, setPendingRequests] = useState<Friend[]>([]);
+
+  useEffect(() => {
+    const loadFriends = async () => {
+      try {
+        const friendsData = await userService.getFriends(); // Already guaranteed to be Friend[]
+        setFriends(friendsData);
+        console.log('Friends (state):', friendsData);
+      } catch (error) {
+        console.error('Error loading friends:', error);
+        setFriends([]); // Set empty array on error
+      }
+    };
+    const loadPendingRequests = async () => {
+      try {
+        const pendingRequestsData = await userService.getPendingFriendRequests(); // Already guaranteed to be Friend[]
+        setPendingRequests(pendingRequestsData);
+        console.log('Pending Requests (state):', pendingRequestsData);
+      } catch (error) {
+        console.error('Error loading pending requests:', error);
+        setPendingRequests([]); // Set empty array on error
+      }
+    };
+    loadFriends();
+    loadPendingRequests();
+  }, []);
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    console.log('Tab changed to:', newValue);
     setActiveTab(newValue);
   };
 
-  const handleEventClick = (clickedEvent: Event) => {
-    if (window.confirm('Принять приглашение на мероприятие?')) {
-      onAcceptInvitation(clickedEvent.id);
-    }
-  };
+  if (isLoading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   return (
-    <Box sx={{ mt: 2 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h6">Друзья</Typography>
-        <Button
-          variant="outlined"
-          startIcon={<PersonAddIcon />}
-          onClick={onAddFriend}
-        >
-          Добавить друга
-        </Button>
+    <Box>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+        <Tabs value={activeTab} onChange={handleTabChange}>
+          <Tab label="Друзья" />
+          <Tab label="Заявки" />
+          <Tab label="Приглашения" />
+        </Tabs>
       </Box>
 
-      <Paper sx={{ width: '100%' }}>
-        <Tabs
-          value={activeTab}
-          onChange={handleTabChange}
-          indicatorColor="primary"
-          textColor="primary"
-        >
-          <Tab 
-            label={`Друзья (${friends.length})`}
-            id="friends-tab-0"
-            aria-controls="friends-tabpanel-0"
-          />
-          <Tab 
-            label={`Заявки (${pendingRequests.length})`}
-            id="friends-tab-1"
-            aria-controls="friends-tabpanel-1"
-          />
-          <Tab 
-            label={`Приглашения (${eventInvitations.length})`}
-            id="friends-tab-2"
-            aria-controls="friends-tabpanel-2"
-          />
-        </Tabs>
-
-        <TabPanel value={activeTab} index={0}>
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr' }, gap: 2 }}>
-            {friends.map((friend) => (
-              <Box key={friend.id}>
-                <FriendCard
-                  friend={friend}
-                  onRemove={onRemoveFriend}
-                />
-              </Box>
-            ))}
-            {friends.length === 0 && (
-              <Box>
-                <Typography color="text.secondary" align="center">
-                  У вас пока нет друзей
-                </Typography>
+      <Paper sx={{ p: 2 }}>
+        {activeTab === 0 && (
+          <Box>
+            {friends.length === 0 ? (
+              <Typography variant="body1" color="text.secondary" align="center">
+                У вас пока нет друзей
+              </Typography>
+            ) : (
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' }, gap: 2 }}>
+                {friends.map((friend) => (
+                  <Box key={friend.id}>
+                    <FriendCard
+                      friend={friend}
+                      onRemove={onRemoveFriend}
+                    />
+                  </Box>
+                ))}
               </Box>
             )}
           </Box>
-        </TabPanel>
+        )}
 
-        <TabPanel value={activeTab} index={1}>
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr' }, gap: 2 }}>
-            {pendingRequests.map((request) => (
-              <Box key={request.id}>
-                <FriendRequestCard
-                  request={request}
-                  onAccept={onAcceptRequest}
-                  onReject={onRejectRequest}
-                />
-              </Box>
-            ))}
-            {pendingRequests.length === 0 && (
-              <Box>
-                <Typography color="text.secondary" align="center">
-                  У вас нет новых заявок в друзья
-                </Typography>
+        {activeTab === 1 && (
+          <Box>
+            {pendingRequests.length === 0 ? (
+              <Typography variant="body1" color="text.secondary" align="center">
+                У вас нет новых заявок
+              </Typography>
+            ) : (
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' }, gap: 2 }}>
+                {pendingRequests.map((request) => (
+                  <Box key={request.id}>
+                    <FriendRequestCard
+                      friend={request}
+                      onAccept={onAcceptRequest}
+                      onReject={onRejectRequest}
+                    />
+                  </Box>
+                ))}
               </Box>
             )}
           </Box>
-        </TabPanel>
+        )}
 
-        <TabPanel value={activeTab} index={2}>
-          {eventInvitations.length > 0 ? (
-            <Box sx={{ mt: 2 }}>
-              <EventList 
-                events={eventInvitations.map(inv => ({
-                  ...inv.event,
-                  title: `Приглашение от ${inv.fromFriend.displayName}: ${inv.event.title}`
-                }))}
-                itemCountColumn={3}
-                isInvitation={true}
-                onAcceptInvitation={onAcceptInvitation}
-                onDeclineInvitation={onDeclineInvitation}
-                favoriteEvents={favoriteEvents || []}
-                onToggleFavorite={onToggleFavorite}
-              />
-            </Box>
-          ) : (
-            <Typography color="text.secondary" align="center">
-              У вас нет новых приглашений на мероприятия
-            </Typography>
-          )}
-        </TabPanel>
+        {/* {activeTab === 2 && (
+          <Box>
+            {Array.isArray(eventInvitations) && eventInvitations.length > 0 ? (
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(3, 1fr)' }, gap: 2 }}>
+                {eventInvitations.map((invitation) => (
+                  <Box key={invitation.event.id}>
+                    <EventInvitationCard
+                      invitation={invitation}
+                      onAccept={onAcceptInvitation}
+                      onDecline={onDeclineInvitation}
+                    />
+                  </Box>
+                ))}
+              </Box>
+            ) : (
+              <Typography variant="body1" color="text.secondary" align="center">
+                У вас нет новых приглашений
+              </Typography>
+            )}
+          </Box>
+        )} */}
       </Paper>
     </Box>
   );

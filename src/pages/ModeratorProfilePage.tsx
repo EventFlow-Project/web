@@ -33,6 +33,8 @@ import SearchAndFilter from '../components/SearchAndFilter';
 import EventList from '../components/EventList';
 import EventEditDialog from '../components/EventEditDialog';
 import UserCard from '../components/UserCard';
+import { CustomTag, DefaultTag } from '../types/Tag';
+
 
 export interface OrganizationRequest extends OrganizerUser {
   isApproved: boolean;
@@ -122,22 +124,38 @@ const ModeratorPage: React.FC = () => {
     } as OrganizerUser,
   ]);
 
+  const img1 = `${process.env.PUBLIC_URL}test.jpg`;
   const [events, setEvents] = useState<Event[]>([
     {
       id: '1',
-      title: 'Мероприятие 1',
-      description: 'Описание мероприятия 1',
-      date: '2024-03-20T10:00',
-      duration: '2 часа',
-      organizer: 'Организатор 1',
+      title: "Крутое пати",
+      description: "Готовьтесь к взрывной вечеринке! Вас ждет ночь полная энергии: зажигательная музыка, яркие световые шоу ",
+      date: "2025-01-05T18:49",
+      duration: " 20:00 – 02:00",
+      organizer: "Аккакий Аккакиевич",
       status: Status.COMINGUP,
+      image: img1,
       location: {
-        lat: 0,
-        lng: 0,
-        address: 'Адрес 1',
-        image: '',
+        lat: 55.755244,
+        lng: 37.618823,
+        address: "«Звездный», Кемский переулок, Санкт-Петербург",
+        image: img1
       },
-      tags: [],
+      tags: [
+        DefaultTag.CONFERENCE,
+        DefaultTag.WORKSHOP,
+        DefaultTag.EXHIBITION,
+        DefaultTag.FESTIVAL,
+        DefaultTag.HACKATHON,
+        DefaultTag.MEETUP,
+        DefaultTag.ONLINE,
+        DefaultTag.OFFLINE,
+        {
+          id: 'custom1',
+          name: 'Мой тег',
+          isCustom: true
+        } as CustomTag
+      ],
     },
   ]);
 
@@ -292,7 +310,7 @@ const ModeratorPage: React.FC = () => {
 
   return (
     <Container maxWidth="lg">
-      <Box sx={{ mt: 4, mb: 4 }}>
+      <Box sx={{ mt: 15, mb: 4 }}>
         <Box sx={{ mb: 4 }}>
           <Button
             variant="contained"

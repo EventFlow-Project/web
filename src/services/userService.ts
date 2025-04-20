@@ -1,4 +1,4 @@
-import { User, SocialUser, BaseUserInfo, PrivacySetting, UpdateUser } from '../types/User';
+import { User, SocialUser, BaseUserInfo, PrivacySetting, UpdateUser, Friend } from '../types/User';
 import { authService } from './authService';
 import { Event } from '../types/Event';
 
@@ -14,13 +14,15 @@ class UserService {
       });
 
       if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        console.error('Error in getCurrentUser:', errorData);
         throw new Error('Ошибка при получении данных пользователя');
       }
 
       const userInfo: BaseUserInfo = await response.json();
       return this.transformUserInfoToSocialUser(userInfo);
     } catch (error) {
-      console.error('Ошибка при получении данных пользователя:', error);
+      console.error('Error in getCurrentUser:', error);
       throw error;
     }
   }
@@ -29,6 +31,7 @@ class UserService {
     try {
       const currentUser = await this.getCurrentUser();
       if (currentUser.id !== userId) {
+        console.error('Access denied in getUserById: User can only view their own profile');
         throw new Error('Доступ запрещен: вы можете просматривать только свой профиль');
       }
 
@@ -39,13 +42,15 @@ class UserService {
       });
 
       if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        console.error('Error in getUserById:', errorData);
         throw new Error('Ошибка при получении данных пользователя');
       }
 
       const userInfo: BaseUserInfo = await response.json();
       return this.transformUserInfoToUser(userInfo);
     } catch (error) {
-      console.error('Ошибка при получении данных пользователя:', error);
+      console.error('Error in getUserById:', error);
       throw error;
     }
   }
@@ -140,6 +145,7 @@ class UserService {
     try {
       const currentUser = await this.getCurrentUser();
       if (userData.email && currentUser.email !== userData.email) {
+        console.error('Access denied in updateUser: User can only edit their own profile');
         throw new Error('Доступ запрещен: вы можете редактировать только свой профиль');
       }
 
@@ -148,12 +154,11 @@ class UserService {
       if (userData.avatar && typeof userData.avatar === 'string') {
         try {
           if (userData.avatar.startsWith('data:image')) {
-            // Убираем префикс data:image/...
             const base64Data = userData.avatar.split(',')[1];
             avatarUrl = await this.uploadAvatar(base64Data);
           }
         } catch (error) {
-          console.error('Ошибка при загрузке аватара:', error);
+          console.error('Error uploading avatar in updateUser:', error);
           throw new Error('Ошибка при загрузке аватара. Пожалуйста, попробуйте еще раз.');
         }
       }
@@ -163,7 +168,6 @@ class UserService {
         name: userData.name || currentUser.name,
         avatar: avatarUrl || currentUser.avatar
       };
-
 
       const response = await fetch(`${this.baseUrl}/users/editInfo`, {
         method: 'PUT',
@@ -176,15 +180,14 @@ class UserService {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => null);
-        console.error('Server response error:', errorData);
-        const errorMessage = errorData?.message || 'Ошибка при обновлении данных пользователя';
-        throw new Error(errorMessage);
+        console.error('Error in updateUser:', errorData);
+        throw new Error(errorData?.message || 'Ошибка при обновлении данных пользователя');
       }
 
       const userInfo: BaseUserInfo = await response.json();
       return this.transformUserInfoToUser(userInfo);
     } catch (error) {
-      console.error('Ошибка при обновлении данных пользователя:', error);
+      console.error('Error in updateUser:', error);
       throw error;
     }
   }
@@ -202,73 +205,192 @@ class UserService {
       });
 
       if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        console.error('Error in updatePrivacySettings:', errorData);
         throw new Error('Ошибка при обновлении настроек приватности');
       }
 
       return await response.json();
     } catch (error) {
-      console.error('Ошибка при обновлении настроек приватности:', error);
+      console.error('Error in updatePrivacySettings:', error);
       throw error;
     }
   }
-
+  // Принятые друзья
   async getFriends(): Promise<SocialUser['friends']> {
     try {
-      const response = await fetch(`${this.baseUrl}/users/getFriends`, {
+      const response = await fetch(`${this.baseUrl}/users/friends`, {
         headers: {
           'Authorization': `Bearer ${authService.getToken()}`
         }
       });
 
       if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        console.error('Error in getFriends:', errorData);
         throw new Error('Ошибка при получении списка друзей');
       }
 
-      return await response.json();
+      const data = await response.json();
+      // Ensure we return the array, even if API wraps it in an object
+      return Array.isArray(data) ? data : (data && Array.isArray(data.friends) ? data.friends : []);
     } catch (error) {
-      console.error('Ошибка при получении списка друзей:', error);
+      console.error('Error in getFriends:', error);
       throw error;
     }
   }
 
+  // Запросы в друзья 
   async getPendingFriendRequests(): Promise<SocialUser['pendingFriendRequests']> {
     try {
-      const response = await fetch(`${this.baseUrl}/me/friend-requests`, {
+      console.log('Запрос заявок в друзья...');
+      const response = await fetch(`${this.baseUrl}/users/friends/incoming`, {
         headers: {
           'Authorization': `Bearer ${authService.getToken()}`
         }
       });
 
       if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        console.error('Error in getPendingFriendRequests:', errorData);
         throw new Error('Ошибка при получении заявок в друзья');
       }
 
-      return await response.json();
+      const data = await response.json();
+      console.log('Получены заявки в друзья (сырые):', data);
+      // Ensure we return the array, handling potential wrapping objects
+      const requestsArray = Array.isArray(data)
+          ? data
+          : (data && Array.isArray(data.requests) 
+             ? data.requests 
+             : (data && Array.isArray(data.pendingFriendRequests) 
+                ? data.pendingFriendRequests 
+                : []));
+      console.log('Возвращаются заявки в друзья (массив):', requestsArray);
+      return requestsArray; 
     } catch (error) {
-      console.error('Ошибка при получении заявок в друзья:', error);
+      console.error('Error in getPendingFriendRequests:', error);
       throw error;
     }
   }
 
-  async getEventInvitations(): Promise<SocialUser['eventInvitations']> {
+
+  async addFriend(friendId: string): Promise<void> {
     try {
-      const response = await fetch(`${this.baseUrl}/me/event-invitations`, {
+      const response = await fetch(`${this.baseUrl}/users/friends/request`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authService.getToken()}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          to_id: friendId
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        console.error('Error in addFriend:', errorData);
+        throw new Error('Ошибка при отправке запроса в друзья');
+      }
+    } catch (error) {
+      console.error('Error in addFriend:', error);
+      throw error;
+    }
+  }
+
+  async removeFriend(friendId: string): Promise<void> {
+    try {
+      const response = await fetch(`${this.baseUrl}/users/friends/${friendId}`, {
+        method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${authService.getToken()}`
         }
       });
 
       if (!response.ok) {
-        throw new Error('Ошибка при получении приглашений на мероприятия');
+        const errorData = await response.json().catch(() => null);
+        console.error('Error in removeFriend:', errorData);
+        throw new Error('Ошибка при удалении друга');
       }
-
-      return await response.json();
     } catch (error) {
-      console.error('Ошибка при получении приглашений на мероприятия:', error);
+      console.error('Error in removeFriend:', error);
       throw error;
     }
   }
 
+  async acceptFriendRequest(friendId: string, accept: boolean): Promise<void> {
+    try {
+      const response = await fetch(`${this.baseUrl}/users/friends/respond`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${authService.getToken()}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          friend_id: friendId,
+          accept: accept
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        console.error('Error in acceptFriendRequest:', errorData);
+        throw new Error('Ошибка при принятии запроса в друзья');
+      }
+    } catch (error) {
+      console.error('Error in acceptFriendRequest:', error);
+      throw error;
+    }
+  }
+  async searchUsers(name: string): Promise<Friend[]> {
+    try {
+      const response = await fetch(
+        `https://api.event-flow.ru/users/search?name=${name}`,
+        {
+          headers: {
+            Authorization: `Bearer ${authService.getToken()}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        console.error('Error in searchUsers:', errorData);
+        throw new Error('Ошибка при поиске пользователей');
+      }
+      
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error in searchUsers:', error);
+      throw error;
+    }
+  }
+
+    // Приглашения на мероприятия
+    async getEventInvitations(): Promise<SocialUser['eventInvitations']> {
+      try {
+        const response = await fetch(`${this.baseUrl}/me/event-invitations`, {
+          headers: {
+            'Authorization': `Bearer ${authService.getToken()}`
+          }
+        });
+  
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => null);
+          console.error('Error in getEventInvitations:', errorData);
+          throw new Error('Ошибка при получении приглашений на мероприятия');
+        }
+  
+        return await response.json();
+      } catch (error) {
+        console.error('Error in getEventInvitations:', error);
+        throw error;
+      }
+    }
+
+  // Избранные мероприятия
   async getFavoriteEvents(): Promise<Event[]> {
     try {
       const response = await fetch(`${this.baseUrl}/me/favorites`, {
@@ -278,34 +400,46 @@ class UserService {
       });
 
       if (!response.ok) {
-        throw new Error('Ошибка при получении избранных мероприятий');
+        const errorData = await response.json().catch(() => null);
+        console.error('Error in getFavoriteEvents:', errorData);
+        throw new Error(errorData?.message || 'Ошибка при получении избранных мероприятий');
       }
 
       return await response.json();
     } catch (error) {
-      console.error('Ошибка при получении избранных мероприятий:', error);
-      throw error;
+      console.error('Error in getFavoriteEvents:', error);
+      if (error instanceof Error) {
+        if (error.message.includes('Failed to fetch')) {
+          throw new Error('Ошибка при получении избранных мероприятий: нет соединения с сервером');
+        }
+        throw error;
+      }
+      throw new Error('Ошибка при получении избранных мероприятий');
     }
   }
 
-  async getUserEvents(userId: string): Promise<Event[]> {
+  async getUserEvents(): Promise<Event[]> {
     try {
-      const response = await fetch(`${this.baseUrl}/${userId}/events`, {
+      const response = await fetch(`${this.baseUrl}/users/events`, {
         headers: {
           'Authorization': `Bearer ${authService.getToken()}`
         }
       });
 
       if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        console.error('Error in getUserEvents:', errorData);
         throw new Error('Ошибка при получении мероприятий пользователя');
       }
 
       return await response.json();
     } catch (error) {
-      console.error('Ошибка при получении мероприятий пользователя:', error);
+      console.error('Error in getUserEvents:', error);
       throw error;
     }
   }
+
+  
 
   async toggleFavoriteEvent(eventId: string): Promise<Event[]> {
     try {
@@ -317,12 +451,14 @@ class UserService {
       });
 
       if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        console.error('Error in toggleFavoriteEvent:', errorData);
         throw new Error('Ошибка при обновлении избранных мероприятий');
       }
 
       return await response.json();
     } catch (error) {
-      console.error('Ошибка при обновлении избранных мероприятий:', error);
+      console.error('Error in toggleFavoriteEvent:', error);
       throw error;
     }
   }
@@ -337,10 +473,12 @@ class UserService {
       });
 
       if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        console.error('Error in signUpForEvent:', errorData);
         throw new Error('Ошибка при записи на мероприятие');
       }
     } catch (error) {
-      console.error('Ошибка при записи на мероприятие:', error);
+      console.error('Error in signUpForEvent:', error);
       throw error;
     }
   }
@@ -355,33 +493,17 @@ class UserService {
       });
 
       if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        console.error('Error in cancelEventRegistration:', errorData);
         throw new Error('Ошибка при отмене записи на мероприятие');
       }
     } catch (error) {
-      console.error('Ошибка при отмене записи на мероприятие:', error);
+      console.error('Error in cancelEventRegistration:', error);
       throw error;
     }
   }
 
-  async getEventRegistrationStatus(eventId: string): Promise<boolean> {
-    try {
-      const response = await fetch(`${this.baseUrl}/events/${eventId}/signup/status`, {
-        headers: {
-          'Authorization': `Bearer ${authService.getToken()}`
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Ошибка при получении статуса записи на мероприятие');
-      }
-
-      const data = await response.json();
-      return data.isRegistered;
-    } catch (error) {
-      console.error('Ошибка при получении статуса записи на мероприятие:', error);
-      throw error;
-    }
-  }
+  
 }
 
 export const userService = new UserService();

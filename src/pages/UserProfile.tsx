@@ -16,12 +16,11 @@ import '../styles/cluster.css';
 import { FriendsList } from '../components/FriendsList';
 import { PrivacySettings } from '../components/PrivacySettings';
 import { ProfileEdit } from '../components/ProfileEdit';
-import { SocialUser, UpdateUser } from '../types/User';
-import { Event, Status } from '../types/Event';
+import { AddFriendDialog } from '../components/AddFriendDialog';
+import { PrivacySetting, SocialUser, UpdateUser, UserRole } from '../types/User';
+import { Event } from '../types/Event';
 import EventList from '../components/EventList';
-import { DefaultTag, CustomTag } from '../types/Tag';
 import { userService } from '../services/userService';
-import { authService } from '../services/authService';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -56,33 +55,34 @@ const UserProfile: React.FC = () => {
   const [events, setEvents] = useState<Event[]>([]);
   const [favoriteEvents, setFavoriteEvents] = useState<Event[]>([]);
   const [friends, setFriends] = useState<SocialUser['friends']>([]);
-  const [pendingRequests, setPendingRequests] = useState<SocialUser['pendingFriendRequests']>([]);
   const [eventInvitations, setEventInvitations] = useState<SocialUser['eventInvitations']>([]);
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [tabErrors, setTabErrors] = useState<{ [key: number]: string | null }>({});
   const [loadedTabs, setLoadedTabs] = useState<number[]>([]);
   const [isTimeout, setIsTimeout] = useState(false);
+  const [isAddFriendDialogOpen, setIsAddFriendDialogOpen] = useState(false);
+  const [friendsUpdateTrigger, setFriendsUpdateTrigger] = useState(0);
 
-  // Проверка авторизации при монтировании
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const token = authService.getToken();
-        if (!token) {
-          navigate('/login');
-          return;
-        }
-        const currentUser = await userService.getCurrentUser();
-        setUser(currentUser);
-      } catch (error) {
-        console.error('Ошибка при проверке авторизации:', error);
-        navigate('/login');
-      }
-    };
+  // // Проверка авторизации при монтировании
+  // useEffect(() => {
+  //   const checkAuth = async () => {
+  //     try {
+  //       const token = authService.getToken();
+  //       if (!token) {
+  //         navigate('/login');
+  //         return;
+  //       }
+  //       const currentUser = await userService.getCurrentUser();
+  //       setUser(currentUser);
+  //     } catch (error) {
+  //       console.error('Ошибка при проверке авторизации:', error);
+  //       navigate('/login');
+  //     }
+  //   };
 
-    checkAuth();
-  }, [navigate]);
+  //   checkAuth();
+  // }, [navigate]);
 
   // Таймаут для загрузки данных
   useEffect(() => {
@@ -103,7 +103,16 @@ const UserProfile: React.FC = () => {
         setIsTimeout(false);
         const userData = await userService.getCurrentUser();
         setUser(userData);
-        setLoadedTabs(prev => [...prev, 0]);
+        
+        // Загружаем данные друзей сразу при монтировании
+        const [friendsData, requestsData, invitationsData] = await Promise.all([
+          userService.getFriends(),
+          userService.getPendingFriendRequests(),
+          userService.getEventInvitations()
+        ]);
+        console.log('Initial friends data:', friendsData);
+        setFriends(friendsData);
+        setEventInvitations(invitationsData);
       } catch (err: unknown) {
         console.error('Ошибка при загрузке данных пользователя:', err);
         setTabErrors(prev => ({ ...prev, 0: 'Ошибка при загрузке данных пользователя' }));
@@ -115,40 +124,65 @@ const UserProfile: React.FC = () => {
     loadUserData();
   }, []);
 
-  // Загрузка данных при переключении табов
+  // Обновляем данные при изменении триггера
+  useEffect(() => {
+    const updateFriendsData = async () => {
+      if (!user) return;
+      
+      try {
+        console.log('Updating friends data due to trigger change');
+        const [friendsData, requestsData, invitationsData] = await Promise.all([
+          userService.getFriends(),
+          userService.getPendingFriendRequests(),
+          userService.getEventInvitations()
+        ]);
+        console.log('Updated friends data:', friendsData);
+        setFriends(friendsData);
+        setEventInvitations(invitationsData);
+      } catch (error) {
+        console.error('Ошибка при обновлении данных друзей:', error);
+        setTabErrors(prev => ({ ...prev, 1: 'Ошибка при обновлении данных друзей' }));
+      }
+    };
+
+    updateFriendsData();
+  }, [friendsUpdateTrigger, user]);
+
+  // Загрузка данных при переключении табов или обновлении друзей
   useEffect(() => {
     const loadTabData = async () => {
-      if (!user || loadedTabs.includes(activeTab)) return;
+      if (!user) return;
 
       try {
         setIsLoading(true);
         setIsTimeout(false);
         switch (activeTab) {
           case 0: // Мои мероприятия
-            const userEvents = await userService.getUserEvents(user.id);
-            setEvents(userEvents);
+            if (!loadedTabs.includes(activeTab)) {
+              const userEvents = await userService.getUserEvents();
+              setEvents(userEvents);
+            }
             break;
           case 1: // Друзья
-            const friendsData = await userService.getFriends();
-            const requestsData = await userService.getPendingFriendRequests();
-            const invitationsData = await userService.getEventInvitations();
-            setFriends(friendsData);
-            setPendingRequests(requestsData);
-            setEventInvitations(invitationsData);
+            // Убедимся, что таб считается "загруженным", чтобы не показывать спиннер
+            if (!loadedTabs.includes(activeTab)) {
+              setLoadedTabs(prev => [...prev, activeTab]);
+            }
+            setTabErrors(prev => ({ ...prev, [activeTab]: null })); // Сбросим ошибку, если она была
             break;
-          case 2: // Настройки приватности
-            // Настройки приватности уже загружены с данными пользователя
+          case 2: 
             break;
           case 3: // Избранное
-            const favoritesData = await userService.getFavoriteEvents();
-            setFavoriteEvents(favoritesData);
+            if (!loadedTabs.includes(activeTab)) {
+              const favoritesData = await userService.getFavoriteEvents();
+              setFavoriteEvents(favoritesData);
+            }
             break;
         }
-        setLoadedTabs(prev => [...prev, activeTab]);
         setTabErrors(prev => ({ ...prev, [activeTab]: null }));
       } catch (error) {
         console.error(`Ошибка при загрузке данных для вкладки ${activeTab}:`, error);
-        setTabErrors(prev => ({ ...prev, [activeTab]: `Ошибка при загрузке данных для вкладки ${activeTab}` }));
+        setTabErrors(prev => ({ ...prev, [activeTab]: error instanceof Error ? error.message : `Ошибка при загрузке данных для вкладки ${error}` }));
       } finally {
         setIsLoading(false);
       }
@@ -156,6 +190,18 @@ const UserProfile: React.FC = () => {
 
     loadTabData();
   }, [activeTab, user, loadedTabs]);
+
+
+  const loadFriends = async () => {
+    try {
+      const friendsData = await userService.getFriends();
+      console.log('Loaded friends:', friendsData);
+      setFriends(friendsData);
+    } catch (error) {
+      console.error('Error loading friends:', error);
+      setTabErrors(prev => ({ ...prev, 1: 'Ошибка при загрузке списка друзей' }));
+    }
+  };
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
@@ -193,6 +239,67 @@ const UserProfile: React.FC = () => {
     } catch (error) {
       console.error('Ошибка при обновлении избранного:', error);
       setTabErrors(prev => ({ ...prev, 3: 'Ошибка при обновлении избранного' }));
+    }
+  };
+
+  // Принятие заявки
+  const handleAcceptRequest = async (userId: string) => {
+    try {
+      await userService.acceptFriendRequest(userId, true);
+      // Обновляем списки через триггер
+      setFriendsUpdateTrigger(prev => prev + 1);
+      // Очищаем ошибку для вкладки заявок
+      setTabErrors(prev => ({ ...prev, 1: null }));
+    } catch (error) {
+      console.error('Ошибка при принятии заявки:', error);
+      setTabErrors(prev => ({ ...prev, 1: 'Ошибка при принятии заявки' }));
+    }
+  };
+
+  // Отклонение заявки
+  const handleRejectRequest = async (userId: string) => {
+    try {
+      await userService.acceptFriendRequest(userId, false);
+      // Обновляем списки через триггер
+      setFriendsUpdateTrigger(prev => prev + 1);
+      // Очищаем ошибку для вкладки заявок
+      setTabErrors(prev => ({ ...prev, 1: null }));
+    } catch (error) {
+      console.error('Ошибка при отклонении заявки:', error);
+      setTabErrors(prev => ({ ...prev, 1: 'Ошибка при отклонении заявки' }));
+    }
+  };
+
+  // Обновляем функцию добавления друга
+  const handleAddFriend = async (friendId: string) => {
+    try {
+      console.log('Adding friend with ID:', friendId);
+      await userService.addFriend(friendId);
+      // Обновляем списки через триггер
+      setFriendsUpdateTrigger(prev => prev + 1);
+      // Очищаем ошибку для вкладки друзей
+      setTabErrors(prev => ({ ...prev, 1: null }));
+      // Принудительно обновляем данные друзей
+      const updatedFriends = await userService.getFriends();
+      console.log('Updated friends after adding:', updatedFriends);
+      setFriends(updatedFriends);
+    } catch (error) {
+      console.error('Ошибка при добавлении друга:', error);
+      setTabErrors(prev => ({ ...prev, 1: 'Ошибка при добавлении друга' }));
+    }
+  };
+
+  // Удаление друга
+  const handleRemoveFriend = async (friendId: string) => {
+    try {
+      await userService.removeFriend(friendId);
+      // Обновляем списки через триггер
+      setFriendsUpdateTrigger(prev => prev + 1);
+      // Очищаем ошибку для вкладки друзей
+      setTabErrors(prev => ({ ...prev, 1: null }));
+    } catch (error) {
+      console.error('Ошибка при удалении друга:', error);
+      setTabErrors(prev => ({ ...prev, 1: 'Ошибка при удалении друга' }));
     }
   };
 
@@ -285,6 +392,10 @@ const UserProfile: React.FC = () => {
   };
 
   const renderTabContent = (tabIndex: number, content: React.ReactNode) => {
+    if (tabIndex === 1) { // Вкладка "Друзья"
+      return content; // Не показываем общие ошибки для вкладки друзей
+    }
+
     if (tabErrors[tabIndex]) {
       return (
         <Box sx={{ p: 3 }}>
@@ -364,15 +475,22 @@ const UserProfile: React.FC = () => {
         </TabPanel>
 
         <TabPanel value={activeTab} index={1}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+            <Typography variant="h6">Друзья</Typography>
+            <Button
+              variant="contained"
+              onClick={() => setIsAddFriendDialogOpen(true)}
+            >
+              Добавить друга
+            </Button>
+          </Box>
           {renderTabContent(1, (
             <FriendsList 
-              friends={friends}
-              pendingRequests={pendingRequests}
               eventInvitations={eventInvitations}
-              onAddFriend={() => {}}
-              onAcceptRequest={() => {}}
-              onRejectRequest={() => {}}
-              onRemoveFriend={() => {}}
+              onAddFriend={handleAddFriend}
+              onAcceptRequest={handleAcceptRequest}
+              onRejectRequest={handleRejectRequest}
+              onRemoveFriend={handleRemoveFriend}
               onAcceptInvitation={() => {}}
               onDeclineInvitation={() => {}}
               favoriteEvents={favoriteEvents.map(e => e.id)}
@@ -409,6 +527,12 @@ const UserProfile: React.FC = () => {
           />
         )}
       </Box>
+
+      <AddFriendDialog
+        open={isAddFriendDialogOpen}
+        onClose={() => setIsAddFriendDialogOpen(false)}
+        onAddFriend={handleAddFriend}
+      />
     </Container>
   );
 };

@@ -51,9 +51,8 @@ export interface OrganizerUser extends BaseUser {
 
 export interface Friend {
   id: string;
-  displayName: string;
+  name: string;
   avatar: string;
-  mutualEvents: string[]; // массив ID общих мероприятий
 }
 
 export interface EventInvitation {
