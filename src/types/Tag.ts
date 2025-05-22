@@ -20,7 +20,6 @@ export const defaultTagColors: Record<DefaultTag, string> = {
   [DefaultTag.OFFLINE]: '#4133FF',
 };
 
-
 export const DEFAULT_CUSTOM_TAG_COLOR = '#808080';
 
 export type CustomTag = {
@@ -30,4 +29,11 @@ export type CustomTag = {
   color?: string;
 };
 
-export type Tag = DefaultTag | CustomTag; 
+export type DefaultTagFormatted = {
+  id: string;
+  name: string;
+  isCustom: false;
+  color: string;
+};
+
+export type Tag = DefaultTag | CustomTag | DefaultTagFormatted; 

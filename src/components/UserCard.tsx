@@ -61,9 +61,9 @@ const UserCard: React.FC<UserCardProps> = ({ user, onEdit, onDelete }) => {
             {user.description}
           </Typography>
         )}
-        {'activityArea' in user && (
+        {'activity_area' in user && (
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            Сфера деятельности: {user.activityArea}
+            Сфера деятельности: {user.activity_area}
           </Typography>
         )}
       </CardContent>

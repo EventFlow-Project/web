@@ -176,7 +176,7 @@ const UserSearchAndFilter: React.FC<UserSearchAndFilterProps> = (props) => {
                     {selected.map((role) => (
                       <Chip
                         key={role}
-                        label={role === UserRole.ADMIN ? 'Администратор' : 
+                        label={role === UserRole.MODERATOR ? 'Администратор' : 
                                role === UserRole.ORGANIZER ? 'Организатор' : 'Участник'}
                         onDelete={() => {
                           const newRoles = selectedRoles.filter(r => r !== role);
@@ -189,7 +189,7 @@ const UserSearchAndFilter: React.FC<UserSearchAndFilterProps> = (props) => {
                   </Box>
                 )}
               >
-                <MenuItem value={UserRole.ADMIN}>Администратор</MenuItem>
+                <MenuItem value={UserRole.MODERATOR}>Администратор</MenuItem>
                 <MenuItem value={UserRole.ORGANIZER}>Организатор</MenuItem>
                 <MenuItem value={UserRole.PARTICIPANT}>Участник</MenuItem>
               </Select>

@@ -13,6 +13,12 @@ export enum Status {
   HELD = 'Прошло',
 }
 
+export enum ModerationStatus {
+  PENDING = 'На модерации',
+  APPROVED = 'Одобрено',
+  REJECTED = 'Отклонено'
+}
+
 export interface Event {
   id: string;
   title: string;
@@ -21,6 +27,7 @@ export interface Event {
   duration: string;
   organizer: string;
   status: Status;
+  moderationStatus: ModerationStatus;
   location: {
     lat: number;
     lng: number;

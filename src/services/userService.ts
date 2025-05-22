@@ -3,7 +3,7 @@ import { authService } from './authService';
 import { Event } from '../types/Event';
 
 class UserService {
-  private baseUrl = 'https://api.event-flow.ru';
+  private baseUrl = 'http://127.0.0.1:8080';
 
   async getCurrentUser(): Promise<SocialUser> {
     try {
@@ -92,8 +92,8 @@ class UserService {
     };
 
     switch (userInfo.role) {
-      case 'ADMIN':
-        return { ...baseUser, role: 'ADMIN' } as User;
+      case 'MODERATOR':
+        return { ...baseUser, role: 'MODERATOR' } as User;
       case 'ORGANIZER':
         return { 
           ...baseUser, 
@@ -485,8 +485,8 @@ class UserService {
 
   async cancelEventRegistration(eventId: string): Promise<void> {
     try {
-      const response = await fetch(`${this.baseUrl}/events/${eventId}/signup`, {
-        method: 'DELETE',
+      const response = await fetch(`${this.baseUrl}/events/${eventId}/cancel`, {
+        method: 'POST',
         headers: {
           'Authorization': `Bearer ${authService.getToken()}`
         }
@@ -495,7 +495,7 @@ class UserService {
       if (!response.ok) {
         const errorData = await response.json().catch(() => null);
         console.error('Error in cancelEventRegistration:', errorData);
-        throw new Error('Ошибка при отмене записи на мероприятие');
+        throw new Error('Ошибка при отмене регистрации на мероприятие');
       }
     } catch (error) {
       console.error('Error in cancelEventRegistration:', error);
@@ -503,7 +503,27 @@ class UserService {
     }
   }
 
-  
+  async checkEventRegistration(eventId: string): Promise<boolean> {
+    try {
+      const response = await fetch(`${this.baseUrl}/events/${eventId}/check-registration`, {
+        headers: {
+          'Authorization': `Bearer ${authService.getToken()}`
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        console.error('Error in checkEventRegistration:', errorData);
+        throw new Error('Ошибка при проверке статуса регистрации');
+      }
+
+      const data = await response.json();
+      return data.isRegistered || false;
+    } catch (error) {
+      console.error('Error in checkEventRegistration:', error);
+      return false;
+    }
+  }
 }
 
 export const userService = new UserService();

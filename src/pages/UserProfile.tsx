@@ -49,6 +49,7 @@ function TabPanel(props: TabPanelProps) {
 }
 
 const UserProfile: React.FC = () => {
+  // помогите 😭
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(0);
   const [user, setUser] = useState<SocialUser | null>(null);
@@ -101,9 +102,30 @@ const UserProfile: React.FC = () => {
       try {
         setIsLoading(true);
         setIsTimeout(false);
-        const userData = await userService.getCurrentUser();
+
+        // const userData = await userService.getCurrentUser();
+        const userData = {
+          id: '1',
+          name: 'John Doe',
+          email: 'john.doe@example.com',
+          avatar: 'https://via.placeholder.com/150',
+          friends: [],
+          eventInvitations: [],
+          privacySettings: {
+            eventsVisibility: PrivacySetting.PUBLIC,
+            friendsListVisibility: PrivacySetting.PUBLIC
+          },
+          pendingFriendRequests: [],
+          events: [],
+          role: UserRole.PARTICIPANT,
+          description: 'Описание пользователя',
+          activity_area: '',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+
         setUser(userData);
-        
+
         // Загружаем данные друзей сразу при монтировании
         const [friendsData, requestsData, invitationsData] = await Promise.all([
           userService.getFriends(),
@@ -128,7 +150,7 @@ const UserProfile: React.FC = () => {
   useEffect(() => {
     const updateFriendsData = async () => {
       if (!user) return;
-      
+
       try {
         console.log('Updating friends data due to trigger change');
         const [friendsData, requestsData, invitationsData] = await Promise.all([
@@ -170,7 +192,7 @@ const UserProfile: React.FC = () => {
             }
             setTabErrors(prev => ({ ...prev, [activeTab]: null })); // Сбросим ошибку, если она была
             break;
-          case 2: 
+          case 2:
             break;
           case 3: // Избранное
             if (!loadedTabs.includes(activeTab)) {
@@ -209,7 +231,7 @@ const UserProfile: React.FC = () => {
 
   const handlePrivacyChange = async (newSettings: SocialUser['privacySettings']) => {
     if (!user) return;
-    
+
     try {
       const updatedUser = await userService.updatePrivacySettings(user.id, newSettings);
       setUser(updatedUser);
@@ -221,7 +243,7 @@ const UserProfile: React.FC = () => {
 
   const handleProfileUpdate = async (updatedUserData: Partial<UpdateUser>) => {
     if (!user) return;
-    
+
     try {
       const updatedUser = await userService.updateUser(updatedUserData);
       setUser(updatedUser as SocialUser);
@@ -445,8 +467,8 @@ const UserProfile: React.FC = () => {
                 {user.email}
               </Typography>
             </Box>
-            <Button 
-              variant="outlined" 
+            <Button
+              variant="outlined"
               onClick={() => setIsEditing(true)}
             >
               Редактировать профиль
@@ -465,9 +487,9 @@ const UserProfile: React.FC = () => {
 
         <TabPanel value={activeTab} index={0}>
           {renderTabContent(0, (
-            <EventList 
-              events={events} 
-              itemCountColumn={3} 
+            <EventList
+              events={events}
+              itemCountColumn={3}
               favoriteEvents={favoriteEvents.map(e => e.id)}
               onToggleFavorite={handleToggleFavorite}
             />
@@ -485,14 +507,14 @@ const UserProfile: React.FC = () => {
             </Button>
           </Box>
           {renderTabContent(1, (
-            <FriendsList 
+            <FriendsList
               eventInvitations={eventInvitations}
               onAddFriend={handleAddFriend}
               onAcceptRequest={handleAcceptRequest}
               onRejectRequest={handleRejectRequest}
               onRemoveFriend={handleRemoveFriend}
-              onAcceptInvitation={() => {}}
-              onDeclineInvitation={() => {}}
+              onAcceptInvitation={() => { }}
+              onDeclineInvitation={() => { }}
               favoriteEvents={favoriteEvents.map(e => e.id)}
               onToggleFavorite={handleToggleFavorite}
             />
@@ -510,8 +532,8 @@ const UserProfile: React.FC = () => {
 
         <TabPanel value={activeTab} index={3}>
           {renderTabContent(3, (
-            <EventList 
-              events={favoriteEvents} 
+            <EventList
+              events={favoriteEvents}
               itemCountColumn={3}
               favoriteEvents={favoriteEvents.map(e => e.id)}
               onToggleFavorite={handleToggleFavorite}
@@ -520,8 +542,8 @@ const UserProfile: React.FC = () => {
         </TabPanel>
 
         {isEditing && (
-          <ProfileEdit 
-            user={user} 
+          <ProfileEdit
+            user={user}
             onSave={handleProfileUpdate}
             onCancel={() => setIsEditing(false)}
           />

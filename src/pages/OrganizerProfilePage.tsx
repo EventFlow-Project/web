@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Container,
   Paper,
@@ -23,17 +23,27 @@ import {
   DialogActions,
   IconButton,
   OutlinedInput,
+  Popover,
+  SxProps,
+  Theme,
+  Tooltip,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import type { Event } from '../types/Event';
-import { Status } from '../types/Event';
-import { OrganizerUser, UserRole } from '../types/User';
-import { DefaultTag, CustomTag } from '../types/Tag';
+import { Status, ModerationStatus } from '../types/Event';
+import { OrganizerUser, UserRole, Friend } from '../types/User';
+import { DefaultTag, CustomTag, DEFAULT_CUSTOM_TAG_COLOR } from '../types/Tag';
 import EventList from '../components/EventList';
 import SearchAndFilter from '../components/SearchAndFilter';
 import EventEditDialog from '../components/EventEditDialog';
+import ColorPicker from '../components/ColorPicker';
+import { geocodeAddress } from '../services/geocodingService';
+import { eventService } from '../services/eventService';
+import { userService } from '../services/userService';
+import { debounce } from 'lodash';
+
 
 // Компонент для создания нового мероприятия
 const CreateEventForm: React.FC<{ 
@@ -59,28 +69,92 @@ const CreateEventForm: React.FC<{
   });
   const [customTagInput, setCustomTagInput] = useState('');
   const [selectedDefaultTags, setSelectedDefaultTags] = useState<DefaultTag[]>([]);
+  const [customTagColor, setCustomTagColor] = useState(DEFAULT_CUSTOM_TAG_COLOR);
+  const [colorPickerAnchor, setColorPickerAnchor] = useState<HTMLButtonElement | null>(null);
   const [eventImagePreview, setEventImagePreview] = useState<string | null>(null);
   const [locationImagePreview, setLocationImagePreview] = useState<string | null>(null);
   const [titleError, setTitleError] = useState('');
   const [descriptionError, setDescriptionError] = useState('');
+  const colorWheelRef = useRef<HTMLCanvasElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [colorInput, setColorInput] = useState('');
+  const [isGeocoding, setIsGeocoding] = useState(false);
+  const [geocodingError, setGeocodingError] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
+  const [addressInput, setAddressInput] = useState('');
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>, isEventImage: boolean) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (isEventImage) {
-          setEventImagePreview(reader.result as string);
-          setEventData(prev => ({ ...prev, image: reader.result as string }));
-        } else {
-          setLocationImagePreview(reader.result as string);
+  // Создаем дебаунсированную функцию для геокодирования
+  const debouncedGeocode = useRef(
+    debounce(async (address: string) => {
+      if (!address.trim()) {
+        setGeocodingError('');
+        return;
+      }
+
+      setIsGeocoding(true);
+      setGeocodingError('');
+
+      try {
+        const coordinates = await geocodeAddress(address);
+        if (coordinates) {
           setEventData(prev => ({
             ...prev,
-            location: { ...prev.location!, image: reader.result as string }
+            location: { ...prev.location!, ...coordinates }
+          }));
+          setGeocodingError('');
+        } else {
+          setGeocodingError('Не удалось определить координаты для указанного адреса');
+        }
+      } catch (error) {
+        console.error('Error during geocoding:', error);
+        setGeocodingError('Ошибка при определении координат');
+      } finally {
+        setIsGeocoding(false);
+      }
+    }, 1000)
+  ).current;
+
+  // Очищаем таймер при размонтировании компонента
+  useEffect(() => {
+    return () => {
+      debouncedGeocode.cancel();
+    };
+  }, [debouncedGeocode]);
+
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>, isEventImage: boolean) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      try {
+        setIsUploading(true);
+        // Конвертируем файл в base64 строку
+        const base64String = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const base64 = reader.result as string;
+            resolve(base64);
+          };
+          reader.readAsDataURL(file);
+        });
+        
+        // Загружаем изображение на сервер
+        const imageUrl = await eventService.uploadEventImage(base64String);
+        
+        if (isEventImage) {
+          setEventImagePreview(imageUrl);
+          setEventData(prev => ({ ...prev, image: imageUrl }));
+        } else {
+          setLocationImagePreview(imageUrl);
+          setEventData(prev => ({
+            ...prev,
+            location: { ...prev.location!, image: imageUrl }
           }));
         }
-      };
-      reader.readAsDataURL(file);
+      } catch (error) {
+        console.error('Error uploading image:', error);
+        // Здесь можно добавить обработку ошибок, например, показ уведомления
+      } finally {
+        setIsUploading(false);
+      }
     }
   };
 
@@ -96,12 +170,22 @@ const CreateEventForm: React.FC<{
 
   const handleDescriptionChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    if (value.length <= 277) {
+    if (value.length <= 254) {
       setEventData(prev => ({ ...prev, description: value }));
       setDescriptionError('');
     } else {
-      setDescriptionError('Описание не должно превышать 277 символов');
+      setDescriptionError('Описание не должно превышать 254 символов');
     }
+  };
+
+  const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newAddress = e.target.value;
+    setAddressInput(newAddress);
+    setEventData(prev => ({
+      ...prev,
+      location: { ...prev.location!, address: newAddress }
+    }));
+    debouncedGeocode(newAddress);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -129,13 +213,15 @@ const CreateEventForm: React.FC<{
       const newCustomTag: CustomTag = {
         id: `custom-${Date.now()}`,
         name: customTagInput.trim(),
-        isCustom: true
+        isCustom: true,
+        color: customTagColor
       };
       setEventData(prev => ({
         ...prev,
         tags: [...(prev.tags || []), newCustomTag]
       }));
       setCustomTagInput('');
+      setCustomTagColor(DEFAULT_CUSTOM_TAG_COLOR);
     }
   };
 
@@ -154,6 +240,46 @@ const CreateEventForm: React.FC<{
         ) || []
       }));
     }
+  };
+
+  const handleColorPickerOpen = (event: React.MouseEvent<HTMLButtonElement>) => {
+    setColorPickerAnchor(event.currentTarget);
+  };
+
+  const handleColorPickerClose = () => {
+    setColorPickerAnchor(null);
+  };
+
+  const handleColorChange = (color: string) => {
+    setCustomTagColor(color);
+  };
+
+  useEffect(() => {
+    setColorInput(customTagColor);
+  }, [customTagColor]);
+
+  const colorButtonStyle: SxProps<Theme> = {
+    backgroundColor: customTagColor,
+    minWidth: '56px',
+    height: '56px',
+    '&:hover': {
+      backgroundColor: customTagColor,
+      opacity: 0.8
+    }
+  };
+
+  const isFormValid = () => {
+    return (
+      eventData.title &&
+      eventData.description &&
+      eventData.date &&
+      eventData.duration &&
+      eventData.location?.address &&
+      eventData.location?.lat !== 0 &&
+      eventData.location?.lng !== 0 &&
+      !isGeocoding &&
+      !geocodingError
+    );
   };
 
   return (
@@ -182,7 +308,7 @@ const CreateEventForm: React.FC<{
             value={eventData.description}
             onChange={handleDescriptionChange}
             error={!!descriptionError}
-            helperText={descriptionError || `${eventData.description?.length || 0}/277 символов`}
+            helperText={descriptionError || `${eventData.description?.length || 0}/254 символов`}
           />
         </div>
         <div>
@@ -193,13 +319,15 @@ const CreateEventForm: React.FC<{
             variant="contained"
             component="label"
             fullWidth
+            disabled={isUploading}
           >
-            Загрузить изображение мероприятия
+            {isUploading ? 'Загрузка...' : 'Загрузить изображение мероприятия'}
             <input
               type="file"
               hidden
               accept="image/*"
               onChange={(e) => handleImageChange(e, true)}
+              disabled={isUploading}
             />
           </Button>
           {eventImagePreview && (
@@ -220,13 +348,15 @@ const CreateEventForm: React.FC<{
             variant="contained"
             component="label"
             fullWidth
+            disabled={isUploading}
           >
-            Загрузить изображение места
+            {isUploading ? 'Загрузка...' : 'Загрузить изображение места'}
             <input
               type="file"
               hidden
               accept="image/*"
               onChange={(e) => handleImageChange(e, false)}
+              disabled={isUploading}
             />
           </Button>
           {locationImagePreview && (
@@ -284,11 +414,10 @@ const CreateEventForm: React.FC<{
             fullWidth
             label="Адрес"
             name="address"
-            value={eventData.location?.address}
-            onChange={(e) => setEventData(prev => ({
-              ...prev,
-              location: { ...prev.location!, address: e.target.value }
-            }))}
+            value={addressInput}
+            onChange={handleAddressChange}
+            error={!!geocodingError}
+            helperText={geocodingError || (isGeocoding ? 'Определение координат...' : '')}
           />
         </div>
         <div>
@@ -336,6 +465,29 @@ const CreateEventForm: React.FC<{
                 }
               }}
             />
+            <Tooltip title="Выбрать цвет">
+              <Button
+                variant="outlined"
+                onClick={handleColorPickerOpen}
+                sx={{
+                  ...colorButtonStyle,
+                  position: 'relative',
+                  '&::after': {
+                    content: '""',
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '50%',
+                    backgroundColor: customTagColor,
+                    border: '2px solid white',
+                    boxShadow: '0 0 0 1px rgba(0,0,0,0.1)',
+                  }
+                }}
+              />
+            </Tooltip>
             <Button
               variant="contained"
               onClick={handleCustomTagAdd}
@@ -344,13 +496,31 @@ const CreateEventForm: React.FC<{
               Добавить
             </Button>
           </Box>
+
+          <ColorPicker
+            anchorEl={colorPickerAnchor}
+            onClose={handleColorPickerClose}
+            color={customTagColor}
+            onChange={handleColorChange}
+          />
+
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1 }}>
             {eventData.tags?.filter((tag): tag is CustomTag => typeof tag !== 'string').map((tag) => (
               <Chip
                 key={tag.id}
                 label={tag.name}
                 onDelete={() => handleTagDelete(tag)}
-                color="primary"
+                sx={{
+                  color: tag.color || DEFAULT_CUSTOM_TAG_COLOR,
+                  borderColor: tag.color || DEFAULT_CUSTOM_TAG_COLOR,
+                  '& .MuiChip-deleteIcon': {
+                    color: tag.color || DEFAULT_CUSTOM_TAG_COLOR,
+                    '&:hover': {
+                      color: tag.color || DEFAULT_CUSTOM_TAG_COLOR,
+                      opacity: 0.7,
+                    }
+                  }
+                }}
                 variant="outlined"
               />
             ))}
@@ -359,7 +529,12 @@ const CreateEventForm: React.FC<{
       </div>
       <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
         <Button onClick={onClose}>Отмена</Button>
-        <Button type="submit" variant="contained" sx={{ ml: 1 }}>
+        <Button 
+          type="submit" 
+          variant="contained" 
+          sx={{ ml: 1 }}
+          disabled={!isFormValid()}
+        >
           Создать
         </Button>
       </Box>
@@ -372,27 +547,144 @@ const OrganizerProfilePage: React.FC = () => {
   const [tabValue, setTabValue] = useState(0);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [mockUser, setMockUser] = useState<OrganizerUser>({
-    id: '1',
-    email: 'org@example.com',
-    name: 'Организатор мероприятий',
-    role: UserRole.ORGANIZER,
-    description: 'Мы организуем лучшие мероприятия в городе',
-    activity_area: 'Организация конференций и фестивалей',
-    created_at: '2024-01-01',
-    updated_at: '2024-01-01',
-    events: [],
-    avatar: '',
-    activityArea: 'Организация конференций и фестивалей'
-  });
-
+  const [isEditProfileDialogOpen, setIsEditProfileDialogOpen] = useState(false);
+  const [organizer, setOrganizer] = useState<OrganizerUser | null>(null);
   const [events, setEvents] = useState<Event[]>([]);
-  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [filteredEvents, setFilteredEvents] = useState<Event[]>([]);
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [favoriteEvents, setFavoriteEvents] = useState<string[]>([]);
+  const [friends, setFriends] = useState<Friend[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const handleCreateEvent = (newEvent: Event) => {
-    setEvents(prev => [...prev, newEvent]);
-    setFilteredEvents(prev => [...prev, newEvent]);
+  // Загрузка данных организатора и его мероприятий
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setIsLoading(true);
+        // Получаем данные текущего пользователя
+        const currentUser = await userService.getCurrentUser();
+        if (currentUser.role !== UserRole.ORGANIZER) {
+          throw new Error('User is not an organizer');
+        }
+        // Преобразуем SocialUser в OrganizerUser
+        const organizerUser: OrganizerUser = {
+          id: currentUser.id,
+          email: currentUser.email,
+          name: currentUser.name,
+          avatar: currentUser.avatar,
+          role: UserRole.ORGANIZER,
+          description: currentUser.description,
+          events: currentUser.events,
+          activity_area: currentUser.activity_area,
+          created_at: currentUser.created_at,
+          updated_at: currentUser.updated_at
+        };
+        setOrganizer(organizerUser);
+        console.log(organizerUser);
+
+        // Получаем мероприятия организатора
+        const eventsData = await eventService.getEventsByOrganizerId(currentUser.id);
+        setEvents(eventsData);
+        setFilteredEvents(eventsData);
+      } catch (error) {
+        console.error('Error loading organizer data:', error);
+        // Здесь можно добавить обработку ошибок, например, показ уведомления
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadData();
+  }, []);
+
+  const handleCreateEvent = async (newEvent: Event) => {
+    try {
+      const createdEvent = await eventService.createEvent(newEvent);
+      setEvents(prev => [...prev, createdEvent]);
+      setFilteredEvents(prev => [...prev, createdEvent]);
+      setIsCreateDialogOpen(false);
+    } catch (error) {
+      console.error('Error creating event:', error);
+      // Здесь можно добавить обработку ошибок
+    }
+  };
+
+  const handleSaveEvent = async (updatedEvent: Event) => {
+    try {
+      await eventService.updateEvent(updatedEvent.id, updatedEvent);
+      setEvents(prev =>
+        prev.map(event =>
+          event.id === updatedEvent.id ? updatedEvent : event
+        )
+      );
+      setFilteredEvents(prev =>
+        prev.map(event =>
+          event.id === updatedEvent.id ? updatedEvent : event
+        )
+      );
+      setIsEditDialogOpen(false);
+      setSelectedEvent(null);
+    } catch (error) {
+      console.error('Error updating event:', error);
+      // Здесь можно добавить обработку ошибок
+    }
+  };
+
+  const handleDeleteEvent = async () => {
+    if (selectedEvent) {
+      try {
+        await eventService.deleteEvent(selectedEvent.id);
+        setEvents(prev => prev.filter(event => event.id !== selectedEvent.id));
+        setFilteredEvents(prev => prev.filter(event => event.id !== selectedEvent.id));
+        setIsEditDialogOpen(false);
+        setSelectedEvent(null);
+      } catch (error) {
+        console.error('Error deleting event:', error);
+        // Здесь можно добавить обработку ошибок
+      }
+    }
+  };
+
+  const handleSaveProfile = async (updatedOrganizer: OrganizerUser) => {
+    try {
+      const savedOrganizer = await userService.updateUser(updatedOrganizer);
+      setOrganizer(savedOrganizer as OrganizerUser);
+      setIsEditProfileDialogOpen(false);
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      // Здесь можно добавить обработку ошибок
+    }
+  };
+
+  const handleAvatarChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file && organizer) {
+      try {
+        setIsLoading(true);
+        // Конвертируем файл в base64 строку
+        const base64String = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const base64 = reader.result as string;
+            resolve(base64);
+          };
+          reader.readAsDataURL(file);
+        });
+        
+        // Загружаем аватар на сервер
+        const avatarUrl = await eventService.uploadEventImage(base64String);
+        const updatedOrganizer = await userService.updateUser({
+          ...organizer,
+          avatar: avatarUrl
+        });
+        setOrganizer(updatedOrganizer as OrganizerUser);
+      } catch (error) {
+        console.error('Error updating avatar:', error);
+        // Здесь можно добавить обработку ошибок
+      } finally {
+        setIsLoading(false);
+      }
+    }
   };
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
@@ -446,64 +738,40 @@ const OrganizerProfilePage: React.FC = () => {
     setFilteredEvents(filteredByStatus);
   };
 
-  const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setMockUser(prev => ({
-          ...prev,
-          avatar: reader.result as string
-        }));
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleEditProfile = () => {
-    setIsEditDialogOpen(true);
-  };
-
-  const handleSaveProfile = (updatedUser: OrganizerUser) => {
-    setMockUser(updatedUser);
-    setIsEditDialogOpen(false);
-  };
-
   const handleEditEvent = (event: Event) => {
     setSelectedEvent(event);
     setIsEditDialogOpen(true);
   };
 
-  const handleSaveEvent = (updatedEvent: Event) => {
-    setEvents(prev =>
-      prev.map(event =>
-        event.id === updatedEvent.id ? updatedEvent : event
-      )
+  const handleToggleFavorite = (eventId: string) => {
+    setFavoriteEvents(prev => 
+      prev.includes(eventId) 
+        ? prev.filter(id => id !== eventId)
+        : [...prev, eventId]
     );
-    setFilteredEvents(prev =>
-      prev.map(event =>
-        event.id === updatedEvent.id ? updatedEvent : event
-      )
-    );
-    setIsEditDialogOpen(false);
-    setSelectedEvent(null);
   };
 
-  const handleDeleteEvent = () => {
-    if (selectedEvent) {
-      setEvents(prev => prev.filter(event => event.id !== selectedEvent.id));
-      setFilteredEvents(prev => prev.filter(event => event.id !== selectedEvent.id));
-      setIsEditDialogOpen(false);
-      setSelectedEvent(null);
-    }
+  const handleInviteFriend = (eventId: string, friendId: string) => {
+    // TODO: Implement friend invitation logic
+    console.log('Invite friend:', friendId, 'to event:', eventId);
   };
+
+  if (isLoading || !organizer) {
+    return (
+      <Container maxWidth="lg">
+        <Box sx={{ mt: 15, mb: 4, display: 'flex', justifyContent: 'center' }}>
+          <Typography>Загрузка...</Typography>
+        </Box>
+      </Container>
+    );
+  }
 
   return (
     <Container maxWidth="lg">
       <Box sx={{ mt: 15, mb: 4 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '24px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '400px 1fr', gap: '24px' }}>
           {/* Информация об организаторе */}
-          <div>
+          <div style={{ width: '400px', flexShrink: 0 }}>
             <Paper 
               sx={{ 
                 p: 3,
@@ -515,7 +783,7 @@ const OrganizerProfilePage: React.FC = () => {
               <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 3 }}>
                 <Box sx={{ position: 'relative' }}>
                   <Avatar
-                    src={mockUser.avatar}
+                    src={organizer.avatar}
                     sx={{ 
                       width: 120, 
                       height: 120, 
@@ -547,24 +815,24 @@ const OrganizerProfilePage: React.FC = () => {
                     <AddIcon />
                   </IconButton>
                 </Box>
-                <Typography variant="h5">{mockUser.name}</Typography>
+                <Typography variant="h5">{organizer.name}</Typography>
                 <Button
                   variant="outlined"
                   startIcon={<EditIcon />}
-                  onClick={handleEditProfile}
+                  onClick={() => setIsEditProfileDialogOpen(true)}
                   sx={{ mt: 2 }}
                 >
                   Редактировать профиль
                 </Button>
               </Box>
               <Typography variant="body1" paragraph>
-                {mockUser.description}
+                {organizer.description}
               </Typography>
               <Typography variant="subtitle2" gutterBottom>
                 Сфера деятельности:
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                {mockUser.activityArea}
+                {organizer.activity_area}
               </Typography>
             </Paper>
           </div>
@@ -596,6 +864,7 @@ const OrganizerProfilePage: React.FC = () => {
                   onFilterChange={handleFilterChange}
                   selectedEvent={selectedEvent}
                   onResetSelection={handleResetSelection}
+                  isOrganizer={true}
                 />
               </Box>
 
@@ -608,8 +877,13 @@ const OrganizerProfilePage: React.FC = () => {
 
               <EventList 
                 events={filteredEvents} 
-                itemCountColumn={2} 
+                itemCountColumn={2}
                 onEventClick={handleEditEvent}
+                favoriteEvents={favoriteEvents}
+                onToggleFavorite={handleToggleFavorite}
+                friends={friends}
+                onInviteFriend={handleInviteFriend}
+                showModerationStatus={true}
               />
             </Paper>
           </div>
@@ -659,15 +933,15 @@ const OrganizerProfilePage: React.FC = () => {
             <CreateEventForm 
               onClose={() => setIsCreateDialogOpen(false)} 
               handleCreateEvent={handleCreateEvent}
-              organizerName={mockUser.name}
+              organizerName={organizer.name}
             />
           </DialogContent>
         </Dialog>
 
         {/* Диалог редактирования профиля */}
         <Dialog 
-          open={isEditDialogOpen} 
-          onClose={() => setIsEditDialogOpen(false)}
+          open={isEditProfileDialogOpen} 
+          onClose={() => setIsEditProfileDialogOpen(false)}
           maxWidth="sm"
           fullWidth
         >
@@ -675,7 +949,7 @@ const OrganizerProfilePage: React.FC = () => {
             Редактирование профиля
             <IconButton
               aria-label="close"
-              onClick={() => setIsEditDialogOpen(false)}
+              onClick={() => setIsEditProfileDialogOpen(false)}
               sx={{
                 position: 'absolute',
                 right: 8,
@@ -690,8 +964,8 @@ const OrganizerProfilePage: React.FC = () => {
               <TextField
                 fullWidth
                 label="Название организации"
-                value={mockUser.name}
-                onChange={(e) => setMockUser(prev => ({ ...prev, name: e.target.value }))}
+                value={organizer.name}
+                onChange={(e) => setOrganizer(prev => prev ? { ...prev, name: e.target.value } : null)}
                 sx={{ mb: 2 }}
               />
               <TextField
@@ -699,24 +973,27 @@ const OrganizerProfilePage: React.FC = () => {
                 multiline
                 rows={3}
                 label="Описание"
-                value={mockUser.description}
-                onChange={(e) => setMockUser(prev => ({ ...prev, description: e.target.value }))}
+                value={organizer.description}
+                onChange={(e) => setOrganizer(prev => prev ? { ...prev, description: e.target.value } : null)}
                 sx={{ mb: 2 }}
               />
               <TextField
                 fullWidth
                 label="Сфера деятельности"
-                value={mockUser.activityArea}
-                onChange={(e) => setMockUser(prev => ({ ...prev, activityArea: e.target.value }))}
+                value={organizer.activity_area}
+                onChange={(e) => setOrganizer(prev => prev ? { 
+                  ...prev, 
+                  activity_area: e.target.value 
+                } : null)}
                 sx={{ mb: 2 }}
               />
             </Box>
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setIsEditDialogOpen(false)}>Отмена</Button>
+            <Button onClick={() => setIsEditProfileDialogOpen(false)}>Отмена</Button>
             <Button 
               variant="contained" 
-              onClick={() => handleSaveProfile(mockUser)}
+              onClick={() => handleSaveProfile(organizer)}
             >
               Сохранить
             </Button>

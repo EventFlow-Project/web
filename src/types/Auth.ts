@@ -11,7 +11,7 @@ export interface RegisterCredentials {
   name: string;
   role: UserRole;
   description?: string;
-  activityArea?: string;
+  activity_area?: string;
 }
 
 export interface AuthResponse {

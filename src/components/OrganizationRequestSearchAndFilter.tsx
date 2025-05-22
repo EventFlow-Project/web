@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import {
   Box,
@@ -44,7 +43,7 @@ const OrganizationRequestSearchAndFilter: React.FC<OrganizationRequestSearchAndF
           request.name.toLowerCase().includes(searchLower) ||
           request.email.toLowerCase().includes(searchLower) ||
           request.description.toLowerCase().includes(searchLower) ||
-          request.activityArea.toLowerCase().includes(searchLower)
+          request.activity_area.toLowerCase().includes(searchLower)
       );
     }
 

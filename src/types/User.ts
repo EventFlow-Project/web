@@ -1,7 +1,6 @@
 import { Event } from './Event';
 
 export enum UserRole {
-  ADMIN = 'ADMIN',
   ORGANIZER = 'ORGANIZER',
   PARTICIPANT = 'PARTICIPANT',
   MODERATOR = 'MODERATOR'
@@ -34,8 +33,8 @@ export interface BaseUser extends BaseUserInfo {
   id: string;
 }
 
-export interface AdminUser extends BaseUser {
-  role: UserRole.ADMIN;
+export interface ModeratorUser extends BaseUser {
+  role: UserRole.MODERATOR;
 }
 
 export interface ParticipantUser extends BaseUser {
@@ -45,7 +44,6 @@ export interface ParticipantUser extends BaseUser {
 export interface OrganizerUser extends BaseUser {
   role: UserRole.ORGANIZER;
   description: string;
-  activityArea: string;
   events: string[]; // массив ID мероприятий
 }
 
@@ -73,15 +71,15 @@ export interface SocialUser extends BaseUser {
   events: string[]; // массив ID мероприятий пользователя
 }
 
-export type User = AdminUser | OrganizerUser | ParticipantUser;
+export type User = ModeratorUser | OrganizerUser | ParticipantUser;
 
 // Type guard для определения типа пользователя
 export const isOrganizer = (user: User): user is OrganizerUser => {
   return user.role === UserRole.ORGANIZER;
 };
 
-export const isAdmin = (user: User): user is AdminUser => {
-  return user.role === UserRole.ADMIN;
+export const isAdmin = (user: User): user is ModeratorUser => {
+  return user.role === UserRole.MODERATOR;
 };
 
 export const isParticipant = (user: User): user is ParticipantUser => {

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Event } from '../types/Event';
+import React, { useState, useEffect, memo } from 'react';
+import { Event, ModerationStatus } from '../types/Event';
 import { 
   Card, 
   CardContent, 
@@ -29,7 +29,7 @@ import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import SearchIcon from '@mui/icons-material/Search';
-import { DefaultTag, defaultTagColors, CustomTag, DEFAULT_CUSTOM_TAG_COLOR } from '../types/Tag';
+import { DefaultTag, defaultTagColors, CustomTag, DEFAULT_CUSTOM_TAG_COLOR, Tag } from '../types/Tag';
 import { Friend } from '../types/User';
 import { userService } from '../services/userService';
 import { authService } from '../services/authService';
@@ -61,7 +61,8 @@ const rippleKeyframes = keyframes`
 `;
 
 
-export const EventCard: React.FC<{ 
+// Создаем мемоизированную версию EventCard
+const EventCardComponent: React.FC<{ 
   event: Event;
   isInvitation?: boolean;
   onAcceptInvitation?: (eventId: string) => void;
@@ -70,6 +71,7 @@ export const EventCard: React.FC<{
   onToggleFavorite?: (eventId: string) => void;
   friends?: Friend[];
   onInviteFriend?: (eventId: string, friendId: string) => void;
+  showModerationStatus?: boolean;
 }> = ({ 
   event,
   isInvitation,
@@ -78,44 +80,69 @@ export const EventCard: React.FC<{
   isFavorite = false,
   onToggleFavorite,
   friends = [],
-  onInviteFriend
+  onInviteFriend,
+  showModerationStatus = false
 }) => {
     const [isFlipped, setIsFlipped] = useState(false);
     const [showRipple, setShowRipple] = useState(false);
     const [lastClickTime, setLastClickTime] = useState(0);
     const [isHovered, setIsHovered] = useState(false);
     const [imagesLoaded, setImagesLoaded] = useState(false);
-    const [frontImage, setFrontImage] = useState<string>(event.image || 'https://via.placeholder.com/300x200');
-    const [backImage, setBackImage] = useState<string>(event.location.image || 'https://via.placeholder.com/300x400');
     const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
-    const [filteredFriends, setFilteredFriends] = useState<Friend[]>(friends);
-    const [isRegistered, setIsRegistered] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [isRegistered, setIsRegistered] = useState(false);
     const isAuthenticated = authService.isAuthenticated();
-  
+
+    // Мемоизируем URL изображений
+    const frontImageUrl = React.useMemo(() => event.image || 'https://via.placeholder.com/300x200', [event.image]);
+    const backImageUrl = React.useMemo(() => event.location.image || 'https://via.placeholder.com/300x400', [event.location.image]);
+
+    // Мемоизируем отфильтрованных друзей
+    const filteredFriends = React.useMemo(() => 
+      friends.filter(friend =>
+        friend.name.toLowerCase().includes(searchTerm.toLowerCase())
+      ),
+      [searchTerm, friends]
+    );
+
+    // Проверяем статус регистрации при монтировании и при изменении event.id
     useEffect(() => {
-      setImagesLoaded(false);
-      
+      const checkRegistrationStatus = async () => {
+        if (!isAuthenticated) {
+          setIsRegistered(false);
+          return;
+        }
+        try {
+          const status = await userService.checkEventRegistration(event.id);
+          setIsRegistered(status);
+        } catch (error) {
+          console.error('Ошибка при проверке статуса регистрации:', error);
+          setIsRegistered(false);
+        }
+      };
+      checkRegistrationStatus();
+    }, [event.id, isAuthenticated]);
+
+    // Загружаем изображения при монтировании
+    React.useEffect(() => {
       const loadImages = async () => {
+        setImagesLoaded(false);
         try {
           const frontImg = new Image();
           const backImg = new Image();
           
           const frontLoadPromise = new Promise((resolve) => {
             frontImg.onload = resolve;
-            frontImg.src = event.image || 'https://via.placeholder.com/300x200';
+            frontImg.src = frontImageUrl;
           });
           
           const backLoadPromise = new Promise((resolve) => {
             backImg.onload = resolve;
-            backImg.src = event.location.image || 'https://via.placeholder.com/300x400';
+            backImg.src = backImageUrl;
           });
           
           await Promise.all([frontLoadPromise, backLoadPromise]);
-          
-          setFrontImage(event.image || 'https://via.placeholder.com/300x200');
-          setBackImage(event.location.image || 'https://via.placeholder.com/300x400');
           setImagesLoaded(true);
         } catch (error) {
           console.error('Error loading images:', error);
@@ -124,28 +151,16 @@ export const EventCard: React.FC<{
       };
       
       loadImages();
-    }, [event.image, event.location.image]);
-  
-    useEffect(() => {
-      setFilteredFriends(
-        friends.filter(friend =>
-            friend.name.toLowerCase().includes(searchTerm.toLowerCase())
-        )
-      );
-    }, [searchTerm, friends]);
-  
-    useEffect(() => {
-      setIsRegistered(isAuthenticated);
-    }, [isAuthenticated]);
-  
-    const getTagColor = (tag: DefaultTag | CustomTag) => {
+    }, [frontImageUrl, backImageUrl]);
+
+    const getTagColor = (tag: Tag): string => {
       if (typeof tag === 'string') {
-        return defaultTagColors[tag];
+        return defaultTagColors[tag as DefaultTag];
       }
       return tag.color || DEFAULT_CUSTOM_TAG_COLOR;
     };
   
-    const getTagLabel = (tag: DefaultTag | CustomTag) => {
+    const getTagLabel = (tag: Tag): string => {
       if (typeof tag === 'string') {
         return tag;
       }
@@ -317,7 +332,7 @@ export const EventCard: React.FC<{
                 <CardMedia
                   component="img"
                   height="300"
-                  image={frontImage}
+                  image={frontImageUrl}
                   sx={{ 
                     borderRadius: '16px',
                     transition: 'opacity 0.3s ease-in-out',
@@ -341,6 +356,25 @@ export const EventCard: React.FC<{
                   }}>
                     {event.status}
                 </Box>
+                {showModerationStatus && (
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      top: 16,
+                      right: 16,
+                      display: 'flex',
+                      fontSize: 16,
+                      color: event.moderationStatus === ModerationStatus.APPROVED ? 'green' : 
+                             event.moderationStatus === ModerationStatus.REJECTED ? 'red' : 'orange',
+                      fontWeight: 'bold',
+                      justifyContent: 'center',
+                      backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                      borderRadius: '10px',
+                      padding: '5px 10px',
+                    }}>
+                    {event.moderationStatus}
+                  </Box>
+                )}
                 {isFavorite && (
                   <Box
                     sx={{
@@ -501,16 +535,12 @@ export const EventCard: React.FC<{
                   WebkitBackfaceVisibility: 'hidden'
                 }}
               >
-                <Box
-                  sx={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    height: '100%',
-                    backgroundImage: `url(${backImage})`,
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
+                <CardMedia
+                  component="img"
+                  height="100%"
+                  width="100%"
+                  image={backImageUrl}
+                  sx={{ 
                     borderRadius: '16px',
                     transition: 'opacity 0.3s ease-in-out',
                     opacity: imagesLoaded ? 1 : 0.7
@@ -729,3 +759,41 @@ export const EventCard: React.FC<{
       </Box>
     );
   };
+
+// Создаем мемоизированную версию компонента
+export const EventCard = memo(EventCardComponent, (prevProps: {
+  event: Event;
+  isInvitation?: boolean;
+  onAcceptInvitation?: (eventId: string) => void;
+  onDeclineInvitation?: (eventId: string) => void;
+  isFavorite?: boolean;
+  onToggleFavorite?: (eventId: string) => void;
+  friends?: Friend[];
+  onInviteFriend?: (eventId: string, friendId: string) => void;
+  showModerationStatus?: boolean;
+}, nextProps: {
+  event: Event;
+  isInvitation?: boolean;
+  onAcceptInvitation?: (eventId: string) => void;
+  onDeclineInvitation?: (eventId: string) => void;
+  isFavorite?: boolean;
+  onToggleFavorite?: (eventId: string) => void;
+  friends?: Friend[];
+  onInviteFriend?: (eventId: string, friendId: string) => void;
+  showModerationStatus?: boolean;
+}) => {
+  // Сравниваем все важные пропсы
+  const prevFriends = prevProps.friends || [];
+  const nextFriends = nextProps.friends || [];
+  
+  return (
+    prevProps.event.id === nextProps.event.id &&
+    prevProps.event.moderationStatus === nextProps.event.moderationStatus &&
+    prevProps.event.status === nextProps.event.status &&
+    prevProps.isInvitation === nextProps.isInvitation &&
+    prevProps.isFavorite === nextProps.isFavorite &&
+    prevProps.showModerationStatus === nextProps.showModerationStatus &&
+    prevFriends.length === nextFriends.length &&
+    JSON.stringify(prevFriends) === JSON.stringify(nextFriends)
+  );
+});

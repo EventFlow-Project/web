@@ -14,6 +14,7 @@ interface EventListProps {
   onToggleFavorite?: (eventId: string) => void;
   friends?: Friend[];
   onInviteFriend?: (eventId: string, friendId: string) => void;
+  showModerationStatus?: boolean;
 }
 
 const EventList: React.FC<EventListProps> = ({ 
@@ -26,13 +27,14 @@ const EventList: React.FC<EventListProps> = ({
   favoriteEvents = [],
   onToggleFavorite,
   friends = [],
-  onInviteFriend
+  onInviteFriend,
+  showModerationStatus = false
 }) => {
   return (
     <div style={{ 
       display: 'grid',
       gridTemplateColumns: `repeat(${itemCountColumn}, 1fr)`,
-      gap: '48px',
+      gap: '24px',
       padding: '15px 0'
     }}>
       {events.map((event) => (
@@ -50,6 +52,7 @@ const EventList: React.FC<EventListProps> = ({
             onToggleFavorite={onToggleFavorite}
             friends={friends}
             onInviteFriend={onInviteFriend}
+            showModerationStatus={showModerationStatus}
           />
         </div>
       ))}

@@ -1,6 +1,6 @@
 import { LoginCredentials, RegisterCredentials, AuthResponse, AuthError } from '../types/Auth';
 
-const API_URL = process.env.REACT_APP_API_URL || 'https://api.event-flow.ru';
+const API_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:8080';
 
 class AuthService {
   private static instance: AuthService;

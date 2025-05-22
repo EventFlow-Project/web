@@ -16,12 +16,18 @@ import {
   Chip,
   OutlinedInput,
   SelectChangeEvent,
+  Popover,
+  SxProps,
+  Theme,
+  Tooltip,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import DeleteIcon from '@mui/icons-material/Delete';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
-import { Event, Status } from '../types/Event';
-import { DefaultTag, CustomTag } from '../types/Tag';
+import { Event, Status, ModerationStatus, Location } from '../types/Event';
+import { DefaultTag, CustomTag, DEFAULT_CUSTOM_TAG_COLOR } from '../types/Tag';
+import ColorPicker from './ColorPicker';
+import { geocodeAddress } from '../services/geocodingService';
 
 interface EventEditDialogProps {
   open: boolean;
@@ -29,6 +35,7 @@ interface EventEditDialogProps {
   event: Event | null;
   onSave: (event: Event) => void;
   onDelete: () => void;
+  isModerator?: boolean;
 }
 
 const EventEditDialog: React.FC<EventEditDialogProps> = ({
@@ -37,12 +44,17 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
   event,
   onSave,
   onDelete,
+  isModerator = false,
 }) => {
   const frontFileInputRef = useRef<HTMLInputElement>(null);
   const backFileInputRef = useRef<HTMLInputElement>(null);
   const [editedEvent, setEditedEvent] = useState<Event | null>(null);
   const [customTagInput, setCustomTagInput] = useState('');
   const [selectedDefaultTags, setSelectedDefaultTags] = useState<DefaultTag[]>([]);
+  const [customTagColor, setCustomTagColor] = useState(DEFAULT_CUSTOM_TAG_COLOR);
+  const [colorPickerAnchor, setColorPickerAnchor] = useState<HTMLButtonElement | null>(null);
+  const [isGeocoding, setIsGeocoding] = useState(false);
+  const [geocodingError, setGeocodingError] = useState('');
 
   useEffect(() => {
     if (event) {
@@ -92,14 +104,37 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
     } : null);
   };
 
-  const handleLocationChange = (field: keyof Event['location']) => (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLocationChange = (field: keyof Event['location']) => async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!editedEvent) return;
+
+    const newValue = e.target.value;
     setEditedEvent(prev => prev ? {
       ...prev,
-      location: {
-        ...prev.location,
-        [field]: e.target.value
-      }
+      location: { ...prev.location, [field]: newValue }
     } : null);
+
+    // If the address field is being changed, geocode it
+    if (field === 'address') {
+      if (!newValue.trim()) {
+        setGeocodingError('');
+        return;
+      }
+
+      setIsGeocoding(true);
+      setGeocodingError('');
+
+      const coordinates = await geocodeAddress(newValue);
+      if (coordinates) {
+        setEditedEvent(prev => prev ? {
+          ...prev,
+          location: { ...prev.location, ...coordinates }
+        } : null);
+        setGeocodingError('');
+      } else {
+        setGeocodingError('Не удалось определить координаты для указанного адреса');
+      }
+      setIsGeocoding(false);
+    }
   };
 
   const handleTagChange = (event: SelectChangeEvent<DefaultTag[]>) => {
@@ -116,14 +151,28 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
       const newCustomTag: CustomTag = {
         id: `custom-${Date.now()}`,
         name: customTagInput.trim(),
-        isCustom: true
+        isCustom: true,
+        color: customTagColor
       };
       setEditedEvent(prev => prev ? {
         ...prev,
         tags: [...prev.tags, newCustomTag]
       } : null);
       setCustomTagInput('');
+      setCustomTagColor(DEFAULT_CUSTOM_TAG_COLOR);
     }
+  };
+
+  const handleColorPickerOpen = (event: React.MouseEvent<HTMLButtonElement>) => {
+    setColorPickerAnchor(event.currentTarget);
+  };
+
+  const handleColorPickerClose = () => {
+    setColorPickerAnchor(null);
+  };
+
+  const handleColorChange = (color: string) => {
+    setCustomTagColor(color);
   };
 
   const handleTagDelete = (tagToDelete: DefaultTag | CustomTag) => {
@@ -147,6 +196,33 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
     if (editedEvent) {
       onSave(editedEvent);
     }
+  };
+
+  const colorButtonStyle: SxProps<Theme> = {
+    backgroundColor: customTagColor,
+    minWidth: '56px',
+    height: '56px',
+    border: '1px solid rgba(0,0,0,0.1)',
+    '&:hover': {
+      backgroundColor: customTagColor,
+      opacity: 0.8
+    }
+  };
+
+  const isFormValid = () => {
+    if (!editedEvent) return false;
+    
+    return (
+      editedEvent.title &&
+      editedEvent.description &&
+      editedEvent.date &&
+      editedEvent.duration &&
+      editedEvent.location.address &&
+      editedEvent.location.lat !== 0 &&
+      editedEvent.location.lng !== 0 &&
+      !isGeocoding &&
+      !geocodingError
+    );
   };
 
   return (
@@ -173,7 +249,7 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
             top: 8,
           }}
         >
-          <DeleteIcon />
+          <CloseIcon />
         </IconButton>
       </DialogTitle>
       <DialogContent 
@@ -372,11 +448,27 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
               <MenuItem value={Status.HELD}>Прошедшее</MenuItem>
             </Select>
           </FormControl>
+          {isModerator && (
+            <FormControl fullWidth sx={{ mb: 2 }}>
+              <InputLabel>Статус модерации</InputLabel>
+              <Select
+                value={editedEvent.moderationStatus}
+                label="Статус модерации"
+                onChange={(e) => setEditedEvent(prev => prev ? { ...prev, moderationStatus: e.target.value as ModerationStatus } : null)}
+              >
+                <MenuItem value={ModerationStatus.PENDING}>На модерации</MenuItem>
+                <MenuItem value={ModerationStatus.APPROVED}>Одобрено</MenuItem>
+                <MenuItem value={ModerationStatus.REJECTED}>Отклонено</MenuItem>
+              </Select>
+            </FormControl>
+          )}
           <TextField
             fullWidth
             label="Адрес"
             value={editedEvent.location.address}
             onChange={handleLocationChange('address')}
+            error={!!geocodingError}
+            helperText={geocodingError || (isGeocoding ? 'Определение координат...' : '')}
             sx={{ mb: 2 }}
           />
 
@@ -424,6 +516,13 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
                 }
               }}
             />
+            <Tooltip title="Выбрать цвет">
+              <Button
+                variant="outlined"
+                onClick={handleColorPickerOpen}
+                sx={colorButtonStyle}
+              />
+            </Tooltip>
             <Button
               variant="contained"
               onClick={handleCustomTagAdd}
@@ -433,13 +532,23 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
             </Button>
           </Box>
 
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+          <ColorPicker
+            anchorEl={colorPickerAnchor}
+            onClose={handleColorPickerClose}
+            color={customTagColor}
+            onChange={handleColorChange}
+          />
+
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1 }}>
             {editedEvent.tags.filter((tag): tag is CustomTag => typeof tag !== 'string').map((tag) => (
               <Chip
                 key={tag.id}
                 label={tag.name}
                 onDelete={() => handleTagDelete(tag)}
-                color="primary"
+                sx={{
+                  color: tag.color || DEFAULT_CUSTOM_TAG_COLOR,
+                  borderColor: tag.color || DEFAULT_CUSTOM_TAG_COLOR,
+                }}
                 variant="outlined"
               />
             ))}
@@ -447,17 +556,14 @@ const EventEditDialog: React.FC<EventEditDialogProps> = ({
         </Box>
       </DialogContent>
       <DialogActions>
-        <Button 
-          color="error" 
-          onClick={onDelete}
-          startIcon={<DeleteIcon />}
-        >
+        <Button onClick={onClose}>Отмена</Button>
+        <Button onClick={onDelete} color="error">
           Удалить
         </Button>
-        <Button onClick={onClose}>Отмена</Button>
         <Button 
-          variant="contained" 
-          onClick={handleSave}
+          onClick={handleSave} 
+          variant="contained"
+          disabled={!isFormValid()}
         >
           Сохранить
         </Button>

@@ -9,7 +9,7 @@ import iconShadow from 'leaflet/dist/images/marker-shadow.png';
 import { Box, Typography } from '@mui/material';
 import EventList from '../components/EventList';
 import SearchAndFilter from '../components/SearchAndFilter';
-import { Event, Status } from '../types/Event';
+import { Event, Status, ModerationStatus } from '../types/Event';
 import { DefaultTag, CustomTag } from '../types/Tag';
 import MarkerClusterGroup from '@changey/react-leaflet-markercluster';
 
@@ -37,6 +37,7 @@ const HomePage: React.FC = () => {
       duration: " 20:00 – 02:00",
       organizer: "Аккакий Аккакиевич",
       status: Status.COMINGUP,
+      moderationStatus: ModerationStatus.APPROVED,
       image: img1,
       location: {
         lat: 55.755244,
@@ -68,6 +69,7 @@ const HomePage: React.FC = () => {
       "duration": "20:00 – 04:00",
       "organizer": "RetroVibes Events",
       "status": Status.HELD,
+      "moderationStatus": ModerationStatus.APPROVED,
       "image": img3,
       "location": {
         "lat": 59.986079,

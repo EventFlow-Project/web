@@ -9,34 +9,38 @@ import {
   Chip,
   OutlinedInput,
   SelectChangeEvent,
-  Paper,
   Button,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
   IconButton,
-  InputAdornment
+  InputAdornment,
+  Tooltip,
 } from '@mui/material';
 import FilterListIcon from '@mui/icons-material/FilterList';
 import SearchIcon from '@mui/icons-material/Search';
 import CloseIcon from '@mui/icons-material/Close';
-import { DefaultTag, CustomTag, Tag } from '../types/Tag';
+import { DefaultTag, CustomTag, Tag, DEFAULT_CUSTOM_TAG_COLOR} from '../types/Tag';
 import { Event, Status } from '../types/Event';
+
 
 interface SearchAndFilterProps {
   events: Event[];
   onFilterChange: (filteredEvents: Event[]) => void;
   selectedEvent: Event | null;
   onResetSelection: () => void;
+  isModerator?: boolean;
+  isOrganizer?: boolean;
 }
 
 const SearchAndFilter: React.FC<SearchAndFilterProps> = (props) => {
-  const { events, onFilterChange, selectedEvent, onResetSelection } = props;
+  const { events, onFilterChange, selectedEvent, onResetSelection, isModerator, isOrganizer } = props;
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<Status[]>([]);
   const [customTagInput, setCustomTagInput] = useState('');
+  const [colorPickerAnchor, setColorPickerAnchor] = useState<HTMLButtonElement | null>(null);
   const [dateRange, setDateRange] = useState('');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [activeFiltersCount, setActiveFiltersCount] = useState(0);
@@ -55,12 +59,12 @@ const SearchAndFilter: React.FC<SearchAndFilterProps> = (props) => {
     updateActiveFiltersCount(newTags, dateRange, selectedStatuses);
   };
 
-  const handleCustomTagAdd = (newValue: string | null) => {
-    if (newValue) {
+  const handleCustomTagAdd = () => {
+    if (customTagInput.trim()) {
       const newCustomTag: CustomTag = {
         id: `custom-${Date.now()}`,
-        name: newValue.trim(),
-        isCustom: true
+        name: customTagInput.trim(),
+        isCustom: true,
       };
       const newTags = [...selectedTags, newCustomTag];
       setSelectedTags(newTags);
@@ -181,6 +185,16 @@ const SearchAndFilter: React.FC<SearchAndFilterProps> = (props) => {
     filterEvents(searchTerm, [], '', []);
   };
 
+  const handleColorPickerOpen = (event: React.MouseEvent<HTMLButtonElement>) => {
+    setColorPickerAnchor(event.currentTarget);
+  };
+
+  const handleColorPickerClose = () => {
+    setColorPickerAnchor(null);
+  };
+
+
+
   return (
     <Box sx={{ height: '56px', display: 'flex', alignItems: 'center' }}>
       <Box sx={{ display: 'flex', gap: 1, width: '100%' }}>
@@ -199,7 +213,7 @@ const SearchAndFilter: React.FC<SearchAndFilterProps> = (props) => {
             )
           }}
         />
-        {selectedEvent ? (
+        {selectedEvent && !isModerator && !isOrganizer ? (
           <Button
             variant="outlined"
             onClick={onResetSelection}
@@ -236,7 +250,7 @@ const SearchAndFilter: React.FC<SearchAndFilterProps> = (props) => {
       <Dialog
         open={isFilterOpen}
         onClose={handleCloseFilter}
-        maxWidth="sm"
+        maxWidth="md"
         fullWidth
       >
         <DialogTitle>
@@ -254,7 +268,7 @@ const SearchAndFilter: React.FC<SearchAndFilterProps> = (props) => {
           </IconButton>
         </DialogTitle>
         <DialogContent dividers>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
             <FormControl fullWidth>
               <InputLabel>Статус мероприятия</InputLabel>
               <Select
@@ -325,27 +339,17 @@ const SearchAndFilter: React.FC<SearchAndFilterProps> = (props) => {
                 label="Добавить свой тег"
                 value={customTagInput}
                 onChange={(e) => setCustomTagInput(e.target.value)}
-                inputProps={{
-                  onKeyPress: (e: React.KeyboardEvent<HTMLInputElement>) => {
-                    if (e.key === 'Enter' && customTagInput.trim()) {
-                      e.preventDefault();
-                      handleCustomTagAdd(customTagInput);
-                      setCustomTagInput('');
-                    }
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleCustomTagAdd();
                   }
                 }}
-                variant="outlined"
               />
               <Button
                 variant="contained"
-                onClick={() => {
-                  if (customTagInput.trim()) {
-                    handleCustomTagAdd(customTagInput);
-                    setCustomTagInput('');
-                  }
-                }}
+                onClick={handleCustomTagAdd}
                 disabled={!customTagInput.trim()}
-                sx={{ height: '56px' }}
               >
                 Добавить
               </Button>
@@ -358,7 +362,10 @@ const SearchAndFilter: React.FC<SearchAndFilterProps> = (props) => {
                     key={(tag as CustomTag).id}
                     label={(tag as CustomTag).name}
                     onDelete={() => handleTagDelete(tag)}
-                    color="primary"
+                    sx={{
+                      color: (tag as CustomTag).color || DEFAULT_CUSTOM_TAG_COLOR,
+                      borderColor: (tag as CustomTag).color || DEFAULT_CUSTOM_TAG_COLOR,
+                    }}
                     variant="outlined"
                   />
                 ))}
