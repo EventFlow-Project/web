@@ -24,7 +24,9 @@ import {
   Tooltip,
   Divider,
   Rating,
-  Stack
+  Stack,
+  CircularProgress,
+  Paper
 } from '@mui/material';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
@@ -32,12 +34,15 @@ import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import SearchIcon from '@mui/icons-material/Search';
-import { DefaultTag, defaultTagColors, CustomTag, DEFAULT_CUSTOM_TAG_COLOR, Tag } from '../types/Tag';
-import { Friend } from '../types/User';
-import { userService } from '../services/userService';
-import { authService } from '../services/authService';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import PeopleIcon from '@mui/icons-material/People';
+import CommentIcon from '@mui/icons-material/Comment';
 import StarIcon from '@mui/icons-material/Star';
 import StarBorderIcon from '@mui/icons-material/StarBorder';
+import { DefaultTag, defaultTagColors, CustomTag, DEFAULT_CUSTOM_TAG_COLOR, Tag } from '../types/Tag';
+import { Friend, SocialUser } from '../types/User';
+import { userService } from '../services/userService';
+import { authService } from '../services/authService';
 
 
 // Настройки эффекта волны
@@ -74,6 +79,13 @@ interface Comment {
   text: string;
   date: string;
   rating: number;
+}
+
+interface EventStats {
+  views: number;
+  participants: number;
+  comments: number;
+  averageRating: number;
 }
 
 // Создаем мемоизированную версию EventCard
@@ -134,6 +146,14 @@ const EventCardComponent: React.FC<{
     const [newComment, setNewComment] = useState('');
     const [newRating, setNewRating] = useState<number | null>(null);
     const [averageRating, setAverageRating] = useState(0);
+    const [currentUser, setCurrentUser] = useState<SocialUser | null>(null);
+    const [isLoadingUser, setIsLoadingUser] = useState(false);
+    const [stats, setStats] = useState<EventStats>({
+      views: Math.floor(Math.random() * 1000) + 100, // Тестовые данные
+      participants: Math.floor(Math.random() * 100) + 10,
+      comments: comments.length,
+      averageRating: averageRating
+    });
 
     // Мемоизируем URL изображений
     const frontImageUrl = React.useMemo(() => event.image || 'https://via.placeholder.com/300x200', [event.image]);
@@ -204,6 +224,34 @@ const EventCardComponent: React.FC<{
       }
     }, [comments]);
 
+    // Обновляем статистику при изменении комментариев
+    useEffect(() => {
+      setStats(prev => ({
+        ...prev,
+        comments: comments.length,
+        averageRating: averageRating
+      }));
+    }, [comments, averageRating]);
+
+    // Загружаем данные текущего пользователя при монтировании
+    useEffect(() => {
+      const loadCurrentUser = async () => {
+        if (!isAuthenticated) return;
+        
+        try {
+          setIsLoadingUser(true);
+          const userData = await userService.getCurrentUser();
+          setCurrentUser(userData);
+        } catch (error) {
+          console.error('Ошибка при загрузке данных пользователя:', error);
+        } finally {
+          setIsLoadingUser(false);
+        }
+      };
+
+      loadCurrentUser();
+    }, [isAuthenticated]);
+
     const getTagColor = (tag: Tag): string => {
       if (typeof tag === 'string') {
         return defaultTagColors[tag as DefaultTag];
@@ -272,12 +320,13 @@ const EventCardComponent: React.FC<{
     };
 
     const handleAddComment = () => {
-      if ((!newComment.trim() && !newRating) || !isAuthenticated) return;
+      if ((!newComment.trim() && !newRating) || !isAuthenticated || !currentUser) return;
 
       const comment: Comment = {
         id: Date.now().toString(),
-        userId: 'currentUser',
-        userName: 'Текущий пользователь',
+        userId: currentUser.id,
+        userName: currentUser.name,
+        userAvatar: currentUser.avatar,
         text: newComment.trim(),
         date: new Date().toISOString(),
         rating: newRating || 0
@@ -887,6 +936,67 @@ const EventCardComponent: React.FC<{
               <Typography variant="body2" color="text.secondary">
                 {event.description}
               </Typography>
+
+              {/* Статистика мероприятия */}
+              <Paper 
+                elevation={0} 
+                sx={{ 
+                  p: 2, 
+                  mt: 2, 
+                  mb: 2,
+                  backgroundColor: 'background.default',
+                  borderRadius: 2
+                }}
+              >
+                <Box sx={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(2, 1fr)',
+                  gap: 2,
+                  '& > *': {
+                    textAlign: 'center'
+                  },
+                  '@media (min-width: 600px)': {
+                    gridTemplateColumns: 'repeat(4, 1fr)'
+                  }
+                }}>
+                  <Box>
+                    <TrendingUpIcon color="primary" sx={{ fontSize: 28 }} />
+                    <Typography variant="h6" sx={{ mt: 0.5 }}>
+                      {stats.views}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Просмотров
+                    </Typography>
+                  </Box>
+                  <Box>
+                    <PeopleIcon color="primary" sx={{ fontSize: 28 }} />
+                    <Typography variant="h6" sx={{ mt: 0.5 }}>
+                      {stats.participants}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Участников
+                    </Typography>
+                  </Box>
+                  <Box>
+                    <CommentIcon color="primary" sx={{ fontSize: 28 }} />
+                    <Typography variant="h6" sx={{ mt: 0.5 }}>
+                      {stats.comments}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Комментариев
+                    </Typography>
+                  </Box>
+                  <Box>
+                    <StarIcon color="primary" sx={{ fontSize: 28 }} />
+                    <Typography variant="h6" sx={{ mt: 0.5 }}>
+                      {stats.averageRating.toFixed(1)}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      Средняя оценка
+                    </Typography>
+                  </Box>
+                </Box>
+              </Paper>
               
               {/* Средняя оценка */}
               <Box sx={{ display: 'flex', alignItems: 'center', mt: 2, mb: 1 }}>
@@ -910,34 +1020,42 @@ const EventCardComponent: React.FC<{
             {isAuthenticated && (
               <Box sx={{ mb: 3 }}>
                 <Stack spacing={2}>
-                  <Box>
-                    <Typography variant="subtitle2" gutterBottom>
-                      Ваша оценка:
-                    </Typography>
-                    <Rating
-                      value={newRating}
-                      onChange={(_, value) => setNewRating(value)}
-                      size="large"
-                      icon={<StarIcon fontSize="inherit" />}
-                      emptyIcon={<StarBorderIcon fontSize="inherit" />}
-                    />
-                  </Box>
-                  <TextField
-                    fullWidth
-                    multiline
-                    rows={2}
-                    placeholder="Написать комментарий..."
-                    value={newComment}
-                    onChange={(e) => setNewComment(e.target.value)}
-                  />
-                  <Button
-                    variant="contained"
-                    onClick={handleAddComment}
-                    disabled={!newRating && !newComment.trim()}
-                    sx={{ alignSelf: 'flex-end' }}
-                  >
-                    Отправить
-                  </Button>
+                  {isLoadingUser ? (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
+                      <CircularProgress size={24} />
+                    </Box>
+                  ) : (
+                    <>
+                      <Box>
+                        <Typography variant="subtitle2" gutterBottom>
+                          Ваша оценка:
+                        </Typography>
+                        <Rating
+                          value={newRating}
+                          onChange={(_, value) => setNewRating(value)}
+                          size="large"
+                          icon={<StarIcon fontSize="inherit" />}
+                          emptyIcon={<StarBorderIcon fontSize="inherit" />}
+                        />
+                      </Box>
+                      <TextField
+                        fullWidth
+                        multiline
+                        rows={2}
+                        placeholder="Написать комментарий..."
+                        value={newComment}
+                        onChange={(e) => setNewComment(e.target.value)}
+                      />
+                      <Button
+                        variant="contained"
+                        onClick={handleAddComment}
+                        disabled={!newRating && !newComment.trim()}
+                        sx={{ alignSelf: 'flex-end' }}
+                      >
+                        Отправить
+                      </Button>
+                    </>
+                  )}
                 </Stack>
               </Box>
             )}
