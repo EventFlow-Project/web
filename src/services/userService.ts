@@ -346,7 +346,7 @@ class UserService {
   async searchUsers(name: string): Promise<Friend[]> {
     try {
       const response = await fetch(
-        `https://api.event-flow.ru/users/search?name=${name}`,
+        `${this.baseUrl}/users/search?name=${name}`,
         {
           headers: {
             Authorization: `Bearer ${authService.getToken()}`,

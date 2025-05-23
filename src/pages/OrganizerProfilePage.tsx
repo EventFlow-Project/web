@@ -44,6 +44,7 @@ import { eventService } from '../services/eventService';
 import { userService } from '../services/userService';
 import { debounce } from 'lodash';
 import { mockOrganizer, mockEvents } from '../mocks/organizerData';
+import EventStatsComponent from '../components/EventStats';
 
 
 // Компонент для создания нового мероприятия
@@ -643,25 +644,27 @@ const OrganizerProfilePage: React.FC = () => {
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
-    // При смене вкладки обновляем отфильтрованные события
-    const eventsToFilter = events;
-    let filteredByStatus = eventsToFilter;
-    
-    switch (newValue) {
-      case 1: // Предстоящие
-        filteredByStatus = eventsToFilter.filter(event => event.status === Status.COMINGUP);
-        break;
-      case 2: // Текущие
-        filteredByStatus = eventsToFilter.filter(event => event.status === Status.UNDERWAY);
-        break;
-      case 3: // Прошедшие
-        filteredByStatus = eventsToFilter.filter(event => event.status === Status.HELD);
-        break;
-      default: // Все
-        break;
+    // При смене вкладки обновляем отфильтрованные события только если это не вкладка статистики
+    if (newValue !== 4) { // 4 - индекс вкладки статистики
+      const eventsToFilter = events;
+      let filteredByStatus = eventsToFilter;
+      
+      switch (newValue) {
+        case 1: // Предстоящие
+          filteredByStatus = eventsToFilter.filter(event => event.status === Status.COMINGUP);
+          break;
+        case 2: // Текущие
+          filteredByStatus = eventsToFilter.filter(event => event.status === Status.UNDERWAY);
+          break;
+        case 3: // Прошедшие
+          filteredByStatus = eventsToFilter.filter(event => event.status === Status.HELD);
+          break;
+        default: // Все
+          break;
+      }
+      
+      setFilteredEvents(filteredByStatus);
     }
-    
-    setFilteredEvents(filteredByStatus);
   };
 
   const handleFilterChange = (filtered: Event[]) => {
@@ -803,42 +806,51 @@ const OrganizerProfilePage: React.FC = () => {
             >
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                 <Typography variant="h5">Мои мероприятия</Typography>
-                <Button
-                  variant="contained"
-                  startIcon={<AddIcon />}
-                  onClick={() => setIsCreateDialogOpen(true)}
-                >
-                  Создать мероприятие
-                </Button>
+                {tabValue !== 4 && ( // Показываем кнопку создания только если не на вкладке статистики
+                  <Button
+                    variant="contained"
+                    startIcon={<AddIcon />}
+                    onClick={() => setIsCreateDialogOpen(true)}
+                  >
+                    Создать мероприятие
+                  </Button>
+                )}
               </Box>
 
-              <Box sx={{ mb: 3 }}>
-                <SearchAndFilter 
-                  events={filteredEvents} 
-                  onFilterChange={handleFilterChange}
-                  selectedEvent={selectedEvent}
-                  onResetSelection={handleResetSelection}
-                  isOrganizer={true}
-                />
-              </Box>
+              {tabValue !== 4 && ( // Показываем поиск и фильтры только если не на вкладке статистики
+                <Box sx={{ mb: 3 }}>
+                  <SearchAndFilter 
+                    events={filteredEvents} 
+                    onFilterChange={handleFilterChange}
+                    selectedEvent={selectedEvent}
+                    onResetSelection={handleResetSelection}
+                    isOrganizer={true}
+                  />
+                </Box>
+              )}
 
               <Tabs value={tabValue} onChange={handleTabChange} sx={{ mb: 3 }}>
                 <Tab label="Все" />
                 <Tab label="Предстоящие" />
                 <Tab label="Текущие" />
                 <Tab label="Прошедшие" />
+                <Tab label="Статистика" />
               </Tabs>
 
-              <EventList 
-                events={filteredEvents} 
-                itemCountColumn={2}
-                onEventClick={handleEditEvent}
-                favoriteEvents={favoriteEvents}
-                onToggleFavorite={handleToggleFavorite}
-                friends={friends}
-                onInviteFriend={handleInviteFriend}
-                showModerationStatus={true}
-              />
+              {tabValue === 4 ? (
+                <EventStatsComponent />
+              ) : (
+                <EventList 
+                  events={filteredEvents} 
+                  itemCountColumn={2}
+                  onEventClick={handleEditEvent}
+                  favoriteEvents={favoriteEvents}
+                  onToggleFavorite={handleToggleFavorite}
+                  friends={friends}
+                  onInviteFriend={handleInviteFriend}
+                  showModerationStatus={true}
+                />
+              )}
             </Paper>
           </div>
         </div>

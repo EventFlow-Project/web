@@ -1,5 +1,5 @@
 import React, { useState, useEffect, memo } from 'react';
-import { Event, ModerationStatus } from '../types/Event';
+import { Event, ModerationStatus, NotableParticipant } from '../types/Event';
 import { 
   Card, 
   CardContent, 
@@ -43,6 +43,7 @@ import { DefaultTag, defaultTagColors, CustomTag, DEFAULT_CUSTOM_TAG_COLOR, Tag 
 import { Friend, SocialUser } from '../types/User';
 import { userService } from '../services/userService';
 import { authService } from '../services/authService';
+import { Verified, Person, Group, EmojiEvents as NotableIcon } from '@mui/icons-material';
 
 
 // Настройки эффекта волны
@@ -87,6 +88,112 @@ interface EventStats {
   comments: number;
   averageRating: number;
 }
+
+// Добавляем моковые данные для известных участников
+const mockNotableParticipants: NotableParticipant[] = [
+  {
+    id: "1",
+    name: "Илон Маск",
+    role: "SPEAKER",
+    avatar: "https://upload.wikimedia.org/wikipedia/commons/3/34/Elon_Musk_Royal_Society_%28crop2%29.jpg",
+    description: "CEO Tesla и SpaceX",
+    isVerified: true
+  },
+  {
+    id: "2",
+    name: "Марк Цукерберг",
+    role: "GUEST",
+    avatar: "https://upload.wikimedia.org/wikipedia/commons/1/18/Mark_Zuckerberg_F8_2019_Keynote_%2832830578717%29_%28cropped%29.jpg",
+    description: "CEO Meta",
+    isVerified: true
+  },
+  {
+    id: "3",
+    name: "Анна Семенович",
+    role: "ORGANIZER",
+    avatar: "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/Anna_Semenovich_2016.jpg/800px-Anna_Semenovich_2016.jpg",
+    description: "Певица и организатор мероприятий",
+    isVerified: true
+  },
+  {
+    id: "4",
+    name: "Дмитрий Нагиев",
+    role: "SPEAKER",
+    avatar: "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4c/Dmitriy_Nagiev_2019.jpg/800px-Dmitriy_Nagiev_2019.jpg",
+    description: "Актер и телеведущий",
+    isVerified: true
+  }
+];
+
+// Обновляем компонент для отображения известных участников
+const NotableParticipantsList: React.FC<{ participants: NotableParticipant[] }> = ({ participants }) => {
+  return (
+    <Box sx={{ mt: 2, mb: 2 }}>
+      <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
+        {participants.map((participant) => (
+          <Chip
+            key={participant.id}
+            avatar={
+              <Avatar 
+                src={participant.avatar}
+                sx={{ 
+                  width: 24, 
+                  height: 24,
+                  bgcolor: 'primary.main',
+                  '& .MuiSvgIcon-root': {
+                    fontSize: '1rem'
+                  }
+                }}
+              >
+                <Person />
+              </Avatar>
+            }
+            label={
+              <Box sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: 0.5,
+                fontSize: '0.875rem'
+              }}>
+                {participant.name}
+                {participant.isVerified && (
+                  <Verified 
+                    fontSize="small" 
+                    color="primary"
+                    sx={{ 
+                      fontSize: '1rem',
+                      ml: 0.5
+                    }} 
+                  />
+                )}
+              </Box>
+            }
+            size="small"
+            variant="outlined"
+            sx={{
+              height: 28,
+              '& .MuiChip-label': {
+                px: 1,
+                fontSize: '0.875rem'
+              },
+              '& .MuiChip-avatar': {
+                width: 24,
+                height: 24,
+                marginLeft: 0.5,
+                marginRight: -4
+              },
+              borderColor: 'primary.light',
+              '&:hover': {
+                borderColor: 'primary.main',
+                backgroundColor: 'action.hover'
+              }
+            }}
+          />
+        ))}
+      </Stack>
+    </Box>
+  );
+};
 
 // Создаем мемоизированную версию EventCard
 const EventCardComponent: React.FC<{ 
@@ -166,6 +273,21 @@ const EventCardComponent: React.FC<{
       ),
       [searchTerm, friends]
     );
+
+    // Добавляем моковые данные к событию, если их нет
+    const eventWithNotableParticipants = React.useMemo(() => {
+      if (!event.notableParticipants) {
+        // Выбираем случайное количество участников (1-3) из моковых данных
+        const randomCount = Math.floor(Math.random() * 3) + 1;
+        const shuffled = [...mockNotableParticipants].sort(() => 0.5 - Math.random());
+        return {
+          ...event,
+          notableParticipants: shuffled.slice(0, randomCount),
+          isNotableEvent: true
+        };
+      }
+      return event;
+    }, [event]);
 
     // Проверяем статус регистрации при монтировании и при изменении event.id
     useEffect(() => {
@@ -336,6 +458,27 @@ const EventCardComponent: React.FC<{
       setNewComment('');
       setNewRating(null);
     };
+
+    // Добавляем стили для карточки с известными участниками
+    const cardStyles = React.useMemo(() => ({
+      position: 'relative' as const,
+      transition: 'transform 0.6s',
+      transformStyle: 'preserve-3d' as const,
+      transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
+      cursor: 'pointer',
+      ...(event.isNotableEvent && {
+        '&::before': {
+          content: '""',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: '4px',
+          background: 'linear-gradient(90deg, #ffd700, #ffa500)',
+          zIndex: 1,
+        },
+      }),
+    }), [isFlipped, event.isNotableEvent]);
 
     return (
       <>
@@ -678,7 +821,7 @@ const EventCardComponent: React.FC<{
                       bottom: 0,
                       left: 0,
                       right: 0,
-                      background: 'linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%)',
+                      background: 'linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.7) 50%, rgba(0,0,0,0) 100%)',
                       padding: '20px',
                       color: 'white',
                       borderBottomLeftRadius: '16px',
@@ -696,6 +839,82 @@ const EventCardComponent: React.FC<{
                     <Typography variant="body2">
                       Продолжительность: {event.duration}
                     </Typography>
+
+                    {/* Добавляем секцию с известными участниками */}
+                    {eventWithNotableParticipants.notableParticipants && 
+                     eventWithNotableParticipants.notableParticipants.length > 0 && (
+                      <Box sx={{ mt: 2, mb: 2 }}>
+                        <Typography variant="subtitle2" sx={{ mb: 1, color: 'white' }}>
+                          Участники мероприятия:
+                        </Typography>
+                        <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
+                          {eventWithNotableParticipants.notableParticipants.map((participant) => (
+                            <Chip
+                              key={participant.id}
+                              avatar={
+                                <Avatar 
+                                  src={participant.avatar}
+                                  sx={{ 
+                                    width: 24, 
+                                    height: 24,
+                                    bgcolor: 'primary.main',
+                                    '& .MuiSvgIcon-root': {
+                                      fontSize: '1rem'
+                                    }
+                                  }}
+                                >
+                                  <Person />
+                                </Avatar>
+                              }
+                              label={
+                                <Box sx={{ 
+                                  display: 'flex', 
+                                  alignItems: 'center', 
+                                  gap: 0.5,
+                                  fontSize: '0.875rem',
+                                  color: 'white'
+                                }}>
+                                  {participant.name}
+                                  {participant.isVerified && (
+                                    <Verified 
+                                      fontSize="small" 
+                                      sx={{ 
+                                        fontSize: '1rem',
+                                        color: '#ffd700'
+                                      }} 
+                                    />
+                                  )}
+                                </Box>
+                              }
+                              size="small"
+                              variant="outlined"
+                              sx={{
+                                height: 28,
+                                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                borderColor: 'rgba(255, 255, 255, 0.3)',
+                                '& .MuiChip-label': {
+                                  px: 1,
+                                  pl: 2.5,
+                                  fontSize: '0.875rem',
+                                  color: 'white'
+                                },
+                                '& .MuiChip-avatar': {
+                                  width: 24,
+                                  height: 24,
+                                  marginLeft: 0.5,
+                                  marginRight: 0
+                                },
+                                '&:hover': {
+                                  backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                                  borderColor: 'rgba(255, 255, 255, 0.5)'
+                                }
+                              }}
+                            />
+                          ))}
+                        </Stack>
+                      </Box>
+                    )}
+
                     <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
                       {isInvitation ? (
                         <>
@@ -950,13 +1169,13 @@ const EventCardComponent: React.FC<{
               >
                 <Box sx={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(2, 1fr)',
+                  gridTemplateColumns: {
+                    xs: 'repeat(2, 1fr)',
+                    sm: 'repeat(4, 1fr)'
+                  },
                   gap: 2,
                   '& > *': {
                     textAlign: 'center'
-                  },
-                  '@media (min-width: 600px)': {
-                    gridTemplateColumns: 'repeat(4, 1fr)'
                   }
                 }}>
                   <Box>
