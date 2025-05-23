@@ -72,6 +72,8 @@ const EventCardComponent: React.FC<{
   friends?: Friend[];
   onInviteFriend?: (eventId: string, friendId: string) => void;
   showModerationStatus?: boolean;
+  onModerateEvent?: (eventId: string, status: ModerationStatus) => void;
+  isModeratorPage?: boolean;
 }> = ({ 
   event,
   isInvitation,
@@ -81,7 +83,9 @@ const EventCardComponent: React.FC<{
   onToggleFavorite,
   friends = [],
   onInviteFriend,
-  showModerationStatus = false
+  showModerationStatus = false,
+  onModerateEvent,
+  isModeratorPage = false
 }) => {
     const [isFlipped, setIsFlipped] = useState(false);
     const [showRipple, setShowRipple] = useState(false);
@@ -210,6 +214,12 @@ const EventCardComponent: React.FC<{
       } finally {
         setIsLoading(false);
       }
+    };
+  
+    // Добавляем обработчики для модерации
+    const handleModerate = (e: React.MouseEvent, status: ModerationStatus) => {
+      e.stopPropagation();
+      onModerateEvent?.(event.id, status);
     };
   
     return (
@@ -675,6 +685,28 @@ const EventCardComponent: React.FC<{
                         </Tooltip>
                       </>
                     )}
+                    {isModeratorPage && event.moderationStatus === ModerationStatus.PENDING && (
+                      <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
+                        <Button
+                          variant="contained"
+                          color="success"
+                          startIcon={<CheckIcon />}
+                          onClick={(e) => handleModerate(e, ModerationStatus.APPROVED)}
+                          size="small"
+                        >
+                          Принять
+                        </Button>
+                        <Button
+                          variant="contained"
+                          color="error"
+                          startIcon={<CloseIcon />}
+                          onClick={(e) => handleModerate(e, ModerationStatus.REJECTED)}
+                          size="small"
+                        >
+                          Отклонить
+                        </Button>
+                      </Box>
+                    )}
                   </Box>
                 </Box>
                 <IconButton
@@ -771,6 +803,8 @@ export const EventCard = memo(EventCardComponent, (prevProps: {
   friends?: Friend[];
   onInviteFriend?: (eventId: string, friendId: string) => void;
   showModerationStatus?: boolean;
+  onModerateEvent?: (eventId: string, status: ModerationStatus) => void;
+  isModeratorPage?: boolean;
 }, nextProps: {
   event: Event;
   isInvitation?: boolean;
@@ -781,6 +815,8 @@ export const EventCard = memo(EventCardComponent, (prevProps: {
   friends?: Friend[];
   onInviteFriend?: (eventId: string, friendId: string) => void;
   showModerationStatus?: boolean;
+  onModerateEvent?: (eventId: string, status: ModerationStatus) => void;
+  isModeratorPage?: boolean;
 }) => {
   // Сравниваем все важные пропсы
   const prevFriends = prevProps.friends || [];
@@ -793,6 +829,7 @@ export const EventCard = memo(EventCardComponent, (prevProps: {
     prevProps.isInvitation === nextProps.isInvitation &&
     prevProps.isFavorite === nextProps.isFavorite &&
     prevProps.showModerationStatus === nextProps.showModerationStatus &&
+    prevProps.isModeratorPage === nextProps.isModeratorPage &&
     prevFriends.length === nextFriends.length &&
     JSON.stringify(prevFriends) === JSON.stringify(nextFriends)
   );

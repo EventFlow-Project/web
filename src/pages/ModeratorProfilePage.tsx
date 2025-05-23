@@ -470,60 +470,39 @@ const ModeratorPage: React.FC = () => {
       )}
 
       {activeTab === 2 && (
-        <>
-          <Typography variant="h5" sx={{ mb: 3 }}>
-            Заявки на организатора
-          </Typography>
-          <Box sx={{ mb: 3 }}>
-            <OrganizationRequestSearchAndFilter 
-              requests={organizationRequests}
-              onFilterChange={handleFilterChange}
-              selectedRequest={selectedRequest}
-              onResetSelection={handleResetSelection}
-            />
+        <Box>
+          <Box sx={{ mb: 2, display: 'flex', gap: 2 }}>
+            <Button
+              variant={moderationFilter === ModerationStatus.PENDING ? "contained" : "outlined"}
+              onClick={() => setModerationFilter(ModerationStatus.PENDING)}
+            >
+              На модерации
+            </Button>
+            <Button
+              variant={moderationFilter === ModerationStatus.APPROVED ? "contained" : "outlined"}
+              onClick={() => setModerationFilter(ModerationStatus.APPROVED)}
+            >
+              Одобренные
+            </Button>
+            <Button
+              variant={moderationFilter === ModerationStatus.REJECTED ? "contained" : "outlined"}
+              onClick={() => setModerationFilter(ModerationStatus.REJECTED)}
+            >
+              Отклоненные
+            </Button>
           </Box>
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
-            {filteredRequests.map((org) => (
-              <Box key={org.id} sx={{ width: { xs: '100%', sm: 'calc(50% - 16px)', md: 'calc(33.33% - 16px)' } }}>
-                <Card sx={{ 
-                  border: '1px solid #e0e0e0',
-                  '&:hover': {
-                    borderColor: 'primary.main',
-                    boxShadow: '0 4px 8px rgba(0,0,0,0.1)'
-                  }
-                }}>
-                  <CardContent>
-                    <Typography variant="h6">{org.name}</Typography>
-                    <Typography color="textSecondary">{org.email}</Typography>
-                    <Typography color="textSecondary">{org.description}</Typography>
-                    <Typography color="textSecondary">Область деятельности: {org.activity_area}</Typography>
-                    <Typography color="textSecondary">Статус: {org.isApproved ? 'Одобрено' : 'На рассмотрении'}</Typography>
-                    <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
-                      {!org.isApproved && (
-                        <>
-                          <Button 
-                            variant="contained" 
-                            color="primary" 
-                            onClick={() => handleApproveOrganization(org.id)}
-                          >
-                            Одобрить
-                          </Button>
-                          <Button 
-                            variant="outlined" 
-                            color="error" 
-                            onClick={() => handleRejectOrganization(org.id)}
-                          >
-                            Отклонить
-                          </Button>
-                        </>
-                      )}
-                    </Box>
-                  </CardContent>
-                </Card>
-              </Box>
+          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 2 }}>
+            {filteredEvents.map((event) => (
+              <EventCard
+                key={event.id}
+                event={event}
+                showModerationStatus={true}
+                isModeratorPage={true}
+                onModerateEvent={handleModerateEvent}
+              />
             ))}
           </Box>
-        </>
+        </Box>
       )}
 
       {/* Диалог создания администратора */}

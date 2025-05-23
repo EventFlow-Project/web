@@ -43,6 +43,7 @@ import { geocodeAddress } from '../services/geocodingService';
 import { eventService } from '../services/eventService';
 import { userService } from '../services/userService';
 import { debounce } from 'lodash';
+import { mockOrganizer, mockEvents } from '../mocks/organizerData';
 
 
 // Компонент для создания нового мероприятия
@@ -548,70 +549,34 @@ const OrganizerProfilePage: React.FC = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isEditProfileDialogOpen, setIsEditProfileDialogOpen] = useState(false);
-  const [organizer, setOrganizer] = useState<OrganizerUser | null>(null);
-  const [events, setEvents] = useState<Event[]>([]);
-  const [filteredEvents, setFilteredEvents] = useState<Event[]>([]);
+  const [organizer, setOrganizer] = useState<OrganizerUser>(mockOrganizer);
+  const [events, setEvents] = useState<Event[]>(mockEvents);
+  const [filteredEvents, setFilteredEvents] = useState<Event[]>(mockEvents);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [favoriteEvents, setFavoriteEvents] = useState<string[]>([]);
   const [friends, setFriends] = useState<Friend[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Загрузка данных организатора и его мероприятий
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        setIsLoading(true);
-        // Получаем данные текущего пользователя
-        const currentUser = await userService.getCurrentUser();
-        if (currentUser.role !== UserRole.ORGANIZER) {
-          throw new Error('User is not an organizer');
-        }
-        // Преобразуем SocialUser в OrganizerUser
-        const organizerUser: OrganizerUser = {
-          id: currentUser.id,
-          email: currentUser.email,
-          name: currentUser.name,
-          avatar: currentUser.avatar,
-          role: UserRole.ORGANIZER,
-          description: currentUser.description,
-          events: currentUser.events,
-          activity_area: currentUser.activity_area,
-          created_at: currentUser.created_at,
-          updated_at: currentUser.updated_at
-        };
-        setOrganizer(organizerUser);
-        console.log(organizerUser);
-
-        // Получаем мероприятия организатора
-        const eventsData = await eventService.getEventsByOrganizerId(currentUser.id);
-        setEvents(eventsData);
-        setFilteredEvents(eventsData);
-      } catch (error) {
-        console.error('Error loading organizer data:', error);
-        // Здесь можно добавить обработку ошибок, например, показ уведомления
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadData();
-  }, []);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   const handleCreateEvent = async (newEvent: Event) => {
     try {
-      const createdEvent = await eventService.createEvent(newEvent);
+      // В реальном приложении здесь был бы вызов API
+      const createdEvent = {
+        ...newEvent,
+        id: Date.now().toString(),
+        moderationStatus: ModerationStatus.PENDING
+      };
       setEvents(prev => [...prev, createdEvent]);
       setFilteredEvents(prev => [...prev, createdEvent]);
       setIsCreateDialogOpen(false);
     } catch (error) {
       console.error('Error creating event:', error);
-      // Здесь можно добавить обработку ошибок
     }
   };
 
   const handleSaveEvent = async (updatedEvent: Event) => {
     try {
-      await eventService.updateEvent(updatedEvent.id, updatedEvent);
+      // В реальном приложении здесь был бы вызов API
       setEvents(prev =>
         prev.map(event =>
           event.id === updatedEvent.id ? updatedEvent : event
@@ -626,33 +591,30 @@ const OrganizerProfilePage: React.FC = () => {
       setSelectedEvent(null);
     } catch (error) {
       console.error('Error updating event:', error);
-      // Здесь можно добавить обработку ошибок
     }
   };
 
   const handleDeleteEvent = async () => {
     if (selectedEvent) {
       try {
-        await eventService.deleteEvent(selectedEvent.id);
+        // В реальном приложении здесь был бы вызов API
         setEvents(prev => prev.filter(event => event.id !== selectedEvent.id));
         setFilteredEvents(prev => prev.filter(event => event.id !== selectedEvent.id));
         setIsEditDialogOpen(false);
         setSelectedEvent(null);
       } catch (error) {
         console.error('Error deleting event:', error);
-        // Здесь можно добавить обработку ошибок
       }
     }
   };
 
   const handleSaveProfile = async (updatedOrganizer: OrganizerUser) => {
     try {
-      const savedOrganizer = await userService.updateUser(updatedOrganizer);
-      setOrganizer(savedOrganizer as OrganizerUser);
+      // В реальном приложении здесь был бы вызов API
+      setOrganizer(updatedOrganizer);
       setIsEditProfileDialogOpen(false);
     } catch (error) {
       console.error('Error updating profile:', error);
-      // Здесь можно добавить обработку ошибок
     }
   };
 
@@ -660,29 +622,21 @@ const OrganizerProfilePage: React.FC = () => {
     const file = event.target.files?.[0];
     if (file && organizer) {
       try {
-        setIsLoading(true);
-        // Конвертируем файл в base64 строку
-        const base64String = await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            const base64 = reader.result as string;
-            resolve(base64);
-          };
-          reader.readAsDataURL(file);
-        });
-        
-        // Загружаем аватар на сервер
-        const avatarUrl = await eventService.uploadEventImage(base64String);
-        const updatedOrganizer = await userService.updateUser({
-          ...organizer,
-          avatar: avatarUrl
-        });
-        setOrganizer(updatedOrganizer as OrganizerUser);
+        setIsUploading(true);
+        // В реальном приложении здесь был бы вызов API для загрузки изображения
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const base64 = reader.result as string;
+          setOrganizer(prev => ({
+            ...prev,
+            avatar: base64
+          }));
+          setIsUploading(false);
+        };
+        reader.readAsDataURL(file);
       } catch (error) {
         console.error('Error updating avatar:', error);
-        // Здесь можно добавить обработку ошибок
-      } finally {
-        setIsLoading(false);
+        setIsUploading(false);
       }
     }
   };
@@ -756,7 +710,7 @@ const OrganizerProfilePage: React.FC = () => {
     console.log('Invite friend:', friendId, 'to event:', eventId);
   };
 
-  if (isLoading || !organizer) {
+  if (isLoading) {
     return (
       <Container maxWidth="lg">
         <Box sx={{ mt: 15, mb: 4, display: 'flex', justifyContent: 'center' }}>
@@ -965,7 +919,13 @@ const OrganizerProfilePage: React.FC = () => {
                 fullWidth
                 label="Название организации"
                 value={organizer.name}
-                onChange={(e) => setOrganizer(prev => prev ? { ...prev, name: e.target.value } : null)}
+                onChange={(e) => {
+                  const updatedOrganizer: OrganizerUser = {
+                    ...organizer,
+                    name: e.target.value
+                  };
+                  setOrganizer(updatedOrganizer);
+                }}
                 sx={{ mb: 2 }}
               />
               <TextField
@@ -974,17 +934,26 @@ const OrganizerProfilePage: React.FC = () => {
                 rows={3}
                 label="Описание"
                 value={organizer.description}
-                onChange={(e) => setOrganizer(prev => prev ? { ...prev, description: e.target.value } : null)}
+                onChange={(e) => {
+                  const updatedOrganizer: OrganizerUser = {
+                    ...organizer,
+                    description: e.target.value
+                  };
+                  setOrganizer(updatedOrganizer);
+                }}
                 sx={{ mb: 2 }}
               />
               <TextField
                 fullWidth
                 label="Сфера деятельности"
                 value={organizer.activity_area}
-                onChange={(e) => setOrganizer(prev => prev ? { 
-                  ...prev, 
-                  activity_area: e.target.value 
-                } : null)}
+                onChange={(e) => {
+                  const updatedOrganizer: OrganizerUser = {
+                    ...organizer,
+                    activity_area: e.target.value
+                  };
+                  setOrganizer(updatedOrganizer);
+                }}
                 sx={{ mb: 2 }}
               />
             </Box>
