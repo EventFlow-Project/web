@@ -103,26 +103,26 @@ const UserProfile: React.FC = () => {
         setIsLoading(true);
         setIsTimeout(false);
 
-        // const userData = await userService.getCurrentUser();
-        const userData = {
-          id: '1',
-          name: 'John Doe',
-          email: 'john.doe@example.com',
-          avatar: 'https://via.placeholder.com/150',
-          friends: [],
-          eventInvitations: [],
-          privacySettings: {
-            eventsVisibility: PrivacySetting.PUBLIC,
-            friendsListVisibility: PrivacySetting.PUBLIC
-          },
-          pendingFriendRequests: [],
-          events: [],
-          role: UserRole.PARTICIPANT,
-          description: 'Описание пользователя',
-          activity_area: '',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
+        const userData = await userService.getCurrentUser();
+        // const userData = {
+        //   id: '1',
+        //   name: 'John Doe',
+        //   email: 'john.doe@example.com',
+        //   avatar: 'https://via.placeholder.com/150',
+        //   friends: [],
+        //   eventInvitations: [],
+        //   privacySettings: {
+        //     eventsVisibility: PrivacySetting.PUBLIC,
+        //     friendsListVisibility: PrivacySetting.PUBLIC
+        //   },
+        //   pendingFriendRequests: [],
+        //   events: [],
+        //   role: UserRole.PARTICIPANT,
+        //   description: 'Описание пользователя',
+        //   activity_area: '',
+        //   created_at: new Date().toISOString(),
+        //   updated_at: new Date().toISOString()
+        // };
 
         setUser(userData);
 
